@@ -1,0 +1,153 @@
+---
+title: Welcome to Calculadora Vigilancia
+description: A powerful payroll calculator for security guards in Colombia with automatic shift scheduling and labor law compliance
+mode: custom
+---
+
+<div className="relative overflow-hidden bg-gradient-to-br from-[#2c3e50] via-[#34495e] to-[#2c3e50] dark:from-[#1a1d27] dark:via-[#242838] dark:to-[#1a1d27] py-20">
+  <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]"></div>
+  
+  <div className="relative max-w-5xl mx-auto px-6 text-center">
+    <h1 className="text-5xl sm:text-6xl font-bold text-white mb-6">
+      Calculadora Vigilancia
+    </h1>
+    <p className="text-xl text-gray-200 dark:text-gray-300 max-w-2xl mx-auto mb-8">
+      Simplify payroll management for security guards with automated shift scheduling, Colombian labor law compliance, and instant PDF reports.
+    </p>
+    
+    <div className="flex flex-wrap justify-center gap-4">
+      <a 
+        href="/quickstart" 
+        className="inline-flex items-center px-6 py-3 bg-[#27ae60] hover:bg-[#229954] text-white font-semibold rounded-lg transition-colors no-underline"
+      >
+        Get Started
+        <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </a>
+      <a 
+        href="/features/payroll-calculation" 
+        className="inline-flex items-center px-6 py-3 border border-white/30 bg-white/10 hover:bg-white/20 text-white font-semibold rounded-lg transition-colors no-underline"
+      >
+        Explore Features
+      </a>
+    </div>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Get Started in Minutes
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400">
+      Three simple steps to calculate your first payroll
+    </p>
+  </div>
+
+  <Steps>
+    <Step title="Set Your Base Salary">
+      Enter the base salary and transportation allowance. The calculator automatically adjusts hourly rates based on Colombian labor law.
+      
+      ```javascript
+      // Base salary: $1,750,905 COP
+      // Transportation allowance: $249,095 COP
+      // Divisor: 220h or 210h (auto-adjusted by date)
+      ```
+    </Step>
+    
+    <Step title="Select Your Shift Pattern">
+      Choose from preset patterns or configure manually:
+      - **2x2x2 Rotativo**: 2 days, 2 nights, 2 rest days
+      - **4x2 Diurno**: 4 day shifts, 2 rest days  
+      - **4x2 Nocturno**: 4 night shifts, 2 rest days
+      - **Manual**: Full control over each day
+    </Step>
+    
+    <Step title="Generate Your Report">
+      The calculator instantly computes wages with surcharges, overtime, deductions, and generates a professional PDF payroll report.
+      
+      <Note>
+      All calculations include automatic recargos (surcharges) for night shifts (0.35x), overtime (1.25x-1.75x), and holidays (1.8x-2.65x).
+      </Note>
+    </Step>
+  </Steps>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Key Features
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400">
+      Everything you need to manage security guard payroll in Colombia
+    </p>
+  </div>
+
+  <CardGroup cols={2}>
+    <Card title="Interactive Calendar" icon="calendar-days" href="/features/interactive-calendar">
+      Visual shift planning with click-to-edit days. See real-time calculations as you adjust schedules.
+    </Card>
+    <Card title="Labor Law Compliance" icon="scale-balanced" href="/features/colombian-labor-law">
+      Automatic divisor adjustments (220h/210h) and surcharge rates following Ley 2101 de 2021.
+    </Card>
+    <Card title="Shift Patterns" icon="clock" href="/features/shift-patterns">
+      Pre-configured rotation patterns for 2x2x2, 4x2 shifts, or full manual control.
+    </Card>
+    <Card title="PDF Export" icon="file-pdf" href="/guide/exporting-pdf">
+      Generate professional payroll reports with detailed breakdowns of hours, rates, and deductions.
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+      Explore by Topic
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400">
+      Deep dive into specific features and calculations
+    </p>
+  </div>
+
+  <CardGroup cols={3}>
+    <Card title="Shift Types" icon="user-clock" href="/reference/shift-types">
+      Diurno, Nocturno, Descanso, Extra/Festivo, Permiso, Ausencia
+    </Card>
+    <Card title="Surcharge Rates" icon="calculator" href="/reference/surcharge-rates">
+      Night (0.35x), Overtime (1.25x-1.75x), Holidays (1.8x-2.65x)
+    </Card>
+    <Card title="Deductions" icon="receipt" href="/reference/deductions">
+      Health (4%), Pension (4%), and IBC calculation
+    </Card>
+    <Card title="Setting Up Salary" icon="dollar-sign" href="/guide/setting-up-salary">
+      Base salary, transport allowance, and divisor configuration
+    </Card>
+    <Card title="Selecting Shifts" icon="list-check" href="/guide/selecting-shifts">
+      Using patterns, manual selection, and cycle start dates
+    </Card>
+    <Card title="Understanding Rates" icon="chart-line" href="/guide/understanding-rates">
+      How hourly values and surcharges are calculated
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="bg-gradient-to-r from-[#2c3e50] to-[#34495e] dark:from-[#1a1d27] dark:to-[#242838] rounded-2xl p-8 text-center border border-[#27272a]">
+    <h2 className="text-2xl font-bold text-white mb-3">
+      Ready to Simplify Your Payroll?
+    </h2>
+    <p className="text-gray-200 dark:text-gray-300 mb-6 max-w-xl mx-auto">
+      Start using Calculadora Vigilancia today and save hours on payroll calculations every month.
+    </p>
+    <a 
+      href="/quickstart" 
+      className="inline-flex items-center px-6 py-3 bg-[#27ae60] hover:bg-[#229954] text-white font-semibold rounded-lg transition-colors no-underline"
+    >
+      Get Started Now
+      <svg className="ml-2 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </a>
+  </div>
+</div>

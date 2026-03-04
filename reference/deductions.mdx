@@ -1,0 +1,393 @@
+---
+title: Deductions Reference
+description: Health and pension deductions with IBC (Income Base for Contributions) calculation
+---
+
+## Overview
+
+Calculadora Vigilancia automatically calculates mandatory social security deductions from gross pay. These deductions are based on Colombian labor law and include:
+
+1. **Health (Salud)** - 4% of IBC
+2. **Pension (Pensión)** - 4% of IBC
+
+Total employee deductions = **8% of IBC**
+
+---
+
+## Deduction Calculation Logic
+
+The deduction calculation is implemented in the `recalculate()` function (lines 686-703):
+
+```javascript:index.html:686-692
+const ibc = grandTotal; // Base for deductions (usually excludes Transport)
+const salud = Math.round(ibc * 0.04);
+const pension = Math.round(ibc * 0.04);
+const totalDeducciones = salud + pension;
+const neto = (grandTotal + finalTransport) - totalDeducciones;
+```
+
+---
+
+## IBC (Ingreso Base de Cotización)
+
+### Definition
+
+**IBC** = Income Base for Contributions
+
+The IBC is the amount on which social security contributions are calculated. In Calculadora Vigilancia:
+
+```javascript
+const ibc = grandTotal;
+```
+
+Where `grandTotal` is defined as:
+
+```javascript
+const grandTotal = finalBasic + totalRecargosExtras;
+```
+
+### IBC Components
+
+**Included in IBC:**
+- ✅ Basic salary (or proportional amount)
+- ✅ Night surcharges (recargos nocturnos)
+- ✅ Extra hours (day and night)
+- ✅ Holiday surcharges
+- ✅ All other shift-related payments
+
+**Excluded from IBC:**
+- ❌ Transportation allowance (Auxilio de Transporte)
+
+### IBC Calculation by Mode
+
+#### Commercial Month Mode (30 days)
+
+```javascript:index.html:668-672
+if (useCommercial) {
+    const daysToPay = 30 - countAusencias;
+    finalBasic = Math.round((rawSalary / 30) * daysToPay);
+    // ... then add surcharges/extras to get grandTotal
+}
+```
+
+**Formula:**
+```
+Basic Salary Component = (Base Salary ÷ 30) × (30 - Absences)
+IBC = Basic Component + Total Surcharges + Total Extras
+```
+
+**Example:**
+- Base Salary: $1,750,905
+- Absences: 2 days
+- Days to Pay: 30 - 2 = 28
+- Basic Component: ($1,750,905 ÷ 30) × 28 = $1,634,176
+- Surcharges/Extras: $450,000 (example)
+- **IBC = $1,634,176 + $450,000 = $2,084,176**
+
+#### Real Days Mode
+
+```javascript:index.html:673-680
+else {
+    finalBasic = Math.round(totalBasic);
+    // totalBasic is sum of daily basic calculations
+    finalTransport = Math.round((rawTransport / 30) * countWorkedDays);
+}
+```
+
+**Formula:**
+```
+Basic Component = Σ(Daily Basic Pay for each worked day)
+IBC = Basic Component + Total Surcharges + Total Extras
+```
+
+**Note:** Real Days mode sums the actual calculated daily basic pay for each day worked/paid.
+
+---
+
+## Health Deduction (Salud)
+
+### Rate
+
+**Employee Contribution:** 4% of IBC
+
+### Calculation
+
+```javascript
+const salud = Math.round(ibc * 0.04);
+```
+
+### Formula
+
+```
+Health Deduction = IBC × 0.04
+```
+
+### Example
+
+**Scenario:**
+- IBC: $2,084,176
+- **Health = $2,084,176 × 0.04 = $83,367**
+
+### Display
+
+Shown in the financial summary as:
+```html
+<div class="stat-row"><span>Salud (4%)</span> <span id="dedSalud">$ 83,367</span></div>
+```
+
+---
+
+## Pension Deduction (Pensión)
+
+### Rate
+
+**Employee Contribution:** 4% of IBC
+
+### Calculation
+
+```javascript
+const pension = Math.round(ibc * 0.04);
+```
+
+### Formula
+
+```
+Pension Deduction = IBC × 0.04
+```
+
+### Example
+
+**Scenario:**
+- IBC: $2,084,176
+- **Pension = $2,084,176 × 0.04 = $83,367**
+
+### Display
+
+Shown in the financial summary as:
+```html
+<div class="stat-row"><span>Pensión (4%)</span> <span id="dedPension">$ 83,367</span></div>
+```
+
+---
+
+## Total Deductions
+
+### Calculation
+
+```javascript
+const totalDeducciones = salud + pension;
+```
+
+### Formula
+
+```
+Total Deductions = Health + Pension
+                 = (IBC × 0.04) + (IBC × 0.04)
+                 = IBC × 0.08
+```
+
+### Example
+
+**Scenario:**
+- IBC: $2,084,176
+- Health: $83,367
+- Pension: $83,367
+- **Total Deductions = $83,367 + $83,367 = $166,734**
+
+### Display
+
+```html
+<div class="stat-row total" style="color: #c0392b;">
+    <span>TOTAL DEDUCCIONES</span> 
+    <span id="totalDeducciones">$ 166,734</span>
+</div>
+```
+
+---
+
+## Net Pay Calculation
+
+### Formula
+
+```javascript:index.html:691
+const neto = (grandTotal + finalTransport) - totalDeducciones;
+```
+
+**Breakdown:**
+```
+Gross Pay = Grand Total (IBC) + Transport Allowance
+Net Pay = Gross Pay - Total Deductions
+        = (IBC + Transport) - (Health + Pension)
+```
+
+### Complete Example
+
+**Inputs:**
+- Base Salary: $1,750,905
+- Transport Allowance: $249,095
+- Days Worked: 28/30 (2 absences)
+- Surcharges/Extras: $450,000
+
+**Step 1: Calculate IBC**
+```
+Basic Component = ($1,750,905 ÷ 30) × 28 = $1,634,176
+IBC = $1,634,176 + $450,000 = $2,084,176
+```
+
+**Step 2: Calculate Transport (Commercial Mode)**
+```
+Transport = ($249,095 ÷ 30) × 28 = $232,489
+```
+
+**Step 3: Calculate Total Accrued (Devengado)**
+```
+Total Accrued = IBC + Transport
+              = $2,084,176 + $232,489
+              = $2,316,665
+```
+
+**Step 4: Calculate Deductions**
+```
+Health = $2,084,176 × 0.04 = $83,367
+Pension = $2,084,176 × 0.04 = $83,367
+Total Deductions = $166,734
+```
+
+**Step 5: Calculate Net Pay**
+```
+Net Pay = $2,316,665 - $166,734 = $2,149,931
+```
+
+### Display in UI
+
+```html
+<div class="final-pay">
+    <small>NETO A PAGAR</small>
+    <h2 id="netPay">$ 2,149,931</h2>
+</div>
+```
+
+---
+
+## Financial Summary Structure
+
+The UI displays a two-column financial summary (lines 258-274):
+
+### Column 1: Accrued (Devengado)
+
+```html
+<div class="col-devengado">
+    <div class="section-header">(+) DEVENGADO</div>
+    <div class="stat-row"><span>Valor Turnos + Recargos</span> <span id="valTotalTurnos">$ 0</span></div>
+    <div class="stat-row"><span>Aux. Transporte</span> <span id="valTransporte">$ 0</span></div>
+    <div class="stat-row total" style="color: var(--accent);">
+        <span>TOTAL DEVENGADO</span> 
+        <span id="totalDevengado">$ 0</span>
+    </div>
+</div>
+```
+
+**Components:**
+- Valor Turnos + Recargos = `grandTotal` (IBC)
+- Aux. Transporte = `finalTransport`
+- **Total Devengado** = `grandTotal + finalTransport`
+
+### Column 2: Deductions (Deducciones)
+
+```html
+<div class="col-deducciones">
+    <div class="section-header">(-) DEDUCCIONES</div>
+    <div class="stat-row"><span>Salud (4%)</span> <span id="dedSalud">$ 0</span></div>
+    <div class="stat-row"><span>Pensión (4%)</span> <span id="dedPension">$ 0</span></div>
+    <div class="stat-row total" style="color: #c0392b;">
+        <span>TOTAL DEDUCCIONES</span> 
+        <span id="totalDeducciones">$ 0</span>
+    </div>
+</div>
+```
+
+**Components:**
+- Salud = `ibc × 0.04`
+- Pensión = `ibc × 0.04`
+- **Total Deducciones** = `salud + pension`
+
+---
+
+## Update Flow
+
+Deductions are recalculated whenever:
+
+1. **Salary changes** → triggers `fullRecalculate()` → calls `recalculate()`
+2. **Transport allowance changes** → triggers `fullRecalculate()` → calls `recalculate()`
+3. **Month/year changes** → triggers `resetAndGenerate()` → calls `fullRecalculate()` → calls `recalculate()`
+4. **Shift type changes** → triggers `updateDayFromModal()` → calls `recalculate()`
+5. **Commercial month toggle** → triggers `fullRecalculate()` → calls `recalculate()`
+
+```javascript:index.html:418-424
+function fullRecalculate() {
+    updateEducationalTable();
+    recalculate();
+    const year = parseInt(document.getElementById('selYear').value);
+    const month = parseInt(document.getElementById('selMonth').value);
+    renderGrid(year, month);
+}
+```
+
+---
+
+## Legal Context
+
+### Colombian Social Security System
+
+**Employee Contributions:**
+- Health: 4% (employer also contributes 8.5%)
+- Pension: 4% (employer also contributes 12%)
+
+**IBC Regulations:**
+- Minimum IBC: 1 SMMLV (minimum wage)
+- Maximum IBC: 25 SMMLV
+- Transportation allowance is NOT contributory income (excluded from IBC)
+
+**Note:** Calculadora Vigilancia implements employee contributions only. Employer contributions are not shown in the employee payslip.
+
+---
+
+## Absence Impact on Deductions
+
+### Commercial Month Mode
+
+Absences reduce the IBC:
+
+```javascript
+const daysToPay = 30 - countAusencias;
+finalBasic = Math.round((rawSalary / 30) * daysToPay);
+```
+
+**Example:**
+- 3 absences in a month
+- Days to Pay: 30 - 3 = 27
+- Basic: (1,750,905 ÷ 30) × 27 = $1,575,815
+- Lower basic → Lower IBC → Lower deductions
+
+### Real Days Mode
+
+Absence days (type 'A') contribute $0:
+
+```javascript:index.html:650-658
+if (dayStates[day] === 'A') {
+    countAusencias++;
+} else {
+    countWorkedDays++;
+    if (!useCommercial) {
+        totalBasic += comps.basic;
+    }
+}
+```
+
+---
+
+## Related References
+
+- [Shift Types](/reference/shift-types) - How different shifts contribute to IBC
+- [Surcharge Rates](/reference/surcharge-rates) - Rates that add to IBC
+- [Calculations](/reference/calculations) - Complete monthly calculation flow

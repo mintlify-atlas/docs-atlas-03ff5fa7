@@ -1,0 +1,337 @@
+---
+title: 'Payroll Calculation'
+description: 'Understand how recargos, extras, and Colombian labor law are applied to calculate security guard payroll'
+icon: 'calculator'
+---
+
+## Overview
+
+Calculadora Vigilancia implements Colombian labor law (Ley 2101 and Código Sustantivo del Trabajo) to calculate payroll for 12-hour security shifts with automatic surcharges (recargos) and overtime (horas extras).
+
+## Core Calculation Formula
+
+<Accordion title="Daily Pay Components">
+  Each work day consists of three components:
+
+  **Total Pay = Basic Hours + Recargos + Extras**
+
+  ```javascript index.html (lines 594-634)
+  function calculateDayComponents(type, year, month, day) {
+      const salary = getRawMoney('baseSalary');
+      const divisor = getDivisorForDate(year, month, day);
+      const hourValue = Math.round(salary / divisor);
+      const festSurcharge = getFestiveSurcharge(year, month, day);
+
+      let total = 0;
+      let details = { basic: 0, recargo: 0, extra: 0 };
+
+      switch(type) {
+          case 'X': // Descanso
+          case 'P': // Permiso
+              total = 8 * hourValue; 
+              details.basic = total;
+              break;
+          case 'A': // Ausencia
+              total = 0;
+              break;
+          case 'D': // Diurno
+              total = (8 * hourValue) + (4 * hourValue * 1.25);
+              details.basic = 8 * hourValue;
+              details.extra = 4 * hourValue * 1.25;
+              break;
+          case 'N': // Nocturno
+              details.basic = (1 * hourValue) + (7 * hourValue);
+              details.recargo = (7 * hourValue * 0.35);
+              details.extra = (4 * hourValue * 1.75);
+              total = details.basic + details.recargo + details.extra;
+              break;
+          case 'E': // Extra/Festivo
+              const valBaseFest = 8 * hourValue * (1 + festSurcharge);
+              const valExtraFest = 4 * hourValue * (1.25 + festSurcharge);
+              total = valBaseFest + valExtraFest;
+              details.basic = 8 * hourValue;
+              details.recargo = (8 * hourValue * festSurcharge);
+              details.extra = valExtraFest; 
+              break;
+      }
+      
+      return { total, ...details };
+  }
+  ```
+</Accordion>
+
+## Hour Value Calculation
+
+**Formula**: `Valor Hora = Salario Básico / Divisor`
+
+The divisor changes based on the date (see [Colombian Labor Law](/features/colombian-labor-law)):
+
+```javascript index.html (lines 387-391)
+function getDivisorForDate(year, month, day) {
+    const current = new Date(year, month - 1, day).getTime();
+    const transition = new Date(2026, 6, 15).getTime(); 
+    return (current >= transition) ? 210 : 220;
+}
+```
+
+### Example with Default Salary
+
+Using the default salary of **$1,750,905**:
+
+<CardGroup cols={2}>
+  <Card title="Before July 15, 2026">
+    **Divisor: 220 hours**
+    
+    Valor Hora = $1,750,905 / 220  
+    = **$7,959** per hour
+  </Card>
+  <Card title="After July 15, 2026">
+    **Divisor: 210 hours**
+    
+    Valor Hora = $1,750,905 / 210  
+    = **$8,338** per hour
+  </Card>
+</CardGroup>
+
+## Shift Type Calculations
+
+### Diurno (Day Shift) - 12 hours
+
+**Structure**: 8 ordinary hours + 4 extra hours
+
+```javascript
+case 'D': // Diurno
+    total = (8 * hourValue) + (4 * hourValue * 1.25);
+    details.basic = 8 * hourValue;
+    details.extra = 4 * hourValue * 1.25;
+```
+
+**With $7,959/hour** (220 divisor):
+- **Basic**: 8h × $7,959 = $63,672
+- **Extras**: 4h × $7,959 × 1.25 = $39,795
+- **Total**: **$103,467**
+
+<Accordion title="Why 4 extra hours?">
+  Colombian law establishes the ordinary workday at 8 hours. A 12-hour security shift exceeds this by 4 hours, which must be paid as overtime (horas extras) at 1.25x the base rate during daytime.
+</Accordion>
+
+### Nocturno (Night Shift) - 12 hours
+
+**Structure**: 8 base hours + 7h night surcharge + 4 extra hours
+
+```javascript
+case 'N': // Nocturno
+    details.basic = (1 * hourValue) + (7 * hourValue);
+    details.recargo = (7 * hourValue * 0.35);
+    details.extra = (4 * hourValue * 1.75);
+    total = details.basic + details.recargo + details.extra;
+```
+
+**With $7,959/hour**:
+- **Basic**: 8h × $7,959 = $63,672
+- **Recargo Nocturno**: 7h × $7,959 × 0.35 = $19,498
+- **Extra Nocturna**: 4h × $7,959 × 1.75 = $55,714
+- **Total**: **$138,884**
+
+<Note>
+  Night shifts pay **34% more** than day shifts ($138,884 vs $103,467) due to the combination of night surcharge (0.35x) and higher overtime multiplier (1.75x vs 1.25x).
+</Note>
+
+### Descanso (Rest Day)
+
+**Structure**: 8 hours base pay, no extras
+
+```javascript
+case 'X': // Descanso
+case 'P': // Permiso
+    total = 8 * hourValue; 
+    details.basic = total;
+```
+
+**With $7,959/hour**:
+- **Total**: 8h × $7,959 = **$63,672**
+
+### Extra/Festivo (Holiday Work)
+
+**Structure**: 8h base + festive surcharge + 4h festive extra
+
+```javascript
+case 'E': // Extra/Festivo
+    const valBaseFest = 8 * hourValue * (1 + festSurcharge);
+    const valExtraFest = 4 * hourValue * (1.25 + festSurcharge);
+    total = valBaseFest + valExtraFest;
+    details.basic = 8 * hourValue;
+    details.recargo = (8 * hourValue * festSurcharge);
+    details.extra = valExtraFest;
+```
+
+The `festSurcharge` changes based on date:
+
+```javascript index.html (lines 393-397)
+function getFestiveSurcharge(year, month, day) {
+    const current = new Date(year, month - 1, day).getTime();
+    const transition2026 = new Date(2026, 6, 1).getTime(); 
+    return (current >= transition2026) ? 0.90 : 0.80;
+}
+```
+
+**Before July 1, 2026** (0.80 surcharge):
+- **Basic**: 8h × $7,959 = $63,672
+- **Recargo Festivo**: 8h × $7,959 × 0.80 = $50,938
+- **Extra Festiva**: 4h × $7,959 × (1.25 + 0.80) = $65,302
+- **Total**: **$179,912**
+
+**After July 1, 2026** (0.90 surcharge):
+- **Basic**: 8h × $8,338 (210 divisor) = $66,704
+- **Recargo Festivo**: 8h × $8,338 × 0.90 = $60,034
+- **Extra Festiva**: 4h × $8,338 × (1.25 + 0.90) = $71,706
+- **Total**: **$198,444**
+
+## Recargos Reference Table
+
+All multipliers are applied to the base hour value:
+
+| Concept | Code | Multiplier | Applies To |
+|---------|------|------------|------------|
+| Hora Ordinaria | ORD | 1.0x | All base hours |
+| Recargo Nocturno | RN | 0.35x | Night hours (9pm-6am) |
+| Extra Diurna | ED | 1.25x | Overtime during day |
+| Extra Nocturna | EN | 1.75x | Overtime during night |
+| Recargo Festivo | RF | 0.80x / 0.90x | Holiday/Sunday work |
+| Extra Festiva Diurna | EFD | 2.05x / 2.15x | Holiday overtime day |
+| Extra Festiva Nocturna | EFN | 2.55x / 2.65x | Holiday overtime night |
+
+<Warning>
+  The festive extra multipliers are **cumulative**: 1.25 (extra) + 0.80 (festive) = 2.05x for daytime, and 1.75 (extra night) + 0.80 (festive) = 2.55x for nighttime.
+</Warning>
+
+## Monthly Totals
+
+### Devengado (Gross Earnings)
+
+```javascript index.html (lines 636-692)
+function recalculate() {
+    // ... loops through all days
+    for (let day = 1; day < dayStates.length; day++) {
+        const comps = calculateDayComponents(dayStates[day], year, month, day);
+        totalRecargosExtras += comps.recargo + comps.extra;
+        
+        if (dayStates[day] === 'A') {
+            countAusencias++;
+        } else {
+            countWorkedDays++;
+            if (!useCommercial) {
+                totalBasic += comps.basic;
+            }
+        }
+    }
+    
+    // Calculate finals
+    if (useCommercial) {
+        const daysToPay = 30 - countAusencias;
+        finalBasic = Math.round((rawSalary / 30) * daysToPay);
+        finalTransport = Math.round((rawTransport / 30) * daysToPay);
+    } else {
+        finalBasic = Math.round(totalBasic);
+        finalTransport = Math.round((rawTransport / 30) * countWorkedDays);
+    }
+    
+    const grandTotal = finalBasic + totalRecargosExtras;
+}
+```
+
+**Components**:
+1. **Valor Turnos + Recargos**: Sum of all daily calculations
+2. **Auxilio Transporte**: Transportation allowance (default $249,095)
+
+### Deducciones (Deductions)
+
+```javascript
+const ibc = grandTotal; // Base for deductions
+const salud = Math.round(ibc * 0.04);
+const pension = Math.round(ibc * 0.04);
+const totalDeducciones = salud + pension;
+```
+
+**Fixed Rates**:
+- **Salud (Health)**: 4% of IBC
+- **Pensión (Pension)**: 4% of IBC
+- **Total**: 8% deduction
+
+<Note>
+  The IBC (Ingreso Base de Cotización) includes basic salary + recargos + extras, but **excludes** transportation allowance per Colombian law.
+</Note>
+
+### Neto a Pagar (Net Pay)
+
+```javascript
+const neto = (grandTotal + finalTransport) - totalDeducciones;
+```
+
+**Formula**: (Devengado Total + Transporte) - Deducciones
+
+## Commercial Month Adjustment
+
+The system offers two calculation modes:
+
+<AccordionGroup>
+  <Accordion title="Mes Comercial (30 días) - DEFAULT">
+    Treats all months as 30 days regardless of actual calendar days.
+
+    **Formula**: `(Salary / 30) × (30 - Absences)`
+
+    **Use Case**: Industry standard for vigilance contracts
+
+    **Benefit**: Consistent monthly pay, easier budgeting
+  </Accordion>
+  
+  <Accordion title="Mes Real (Días Calendario)">
+    Uses actual calendar days (28-31).
+
+    **Formula**: Sum of all daily calculations
+
+    **Use Case**: Precise calculation for partial months
+
+    **Note**: 31-day months will exceed base salary proportionally
+  </Accordion>
+</AccordionGroup>
+
+## Complete Example
+
+**Scenario**: 2D2N2X pattern for March 2026 (before divisor change)
+
+**Input**:
+- Salary: $1,750,905
+- Transport: $249,095
+- Pattern: 2D2N2X (rotates every 6 days)
+- Month: 30 days
+
+**Work Distribution**:
+- 10 day shifts × $103,467 = $1,034,670
+- 10 night shifts × $138,884 = $1,388,840
+- 10 rest days × $63,672 = $636,720
+
+**Totals**:
+- **Basic**: $1,750,905 (commercial month)
+- **Recargos**: ~$194,980 (night surcharges)
+- **Extras**: ~$954,050 (overtime pay)
+- **Gross**: $2,899,935
+- **Transport**: +$249,095
+- **Health**: -$115,997
+- **Pension**: -$115,997
+- **Net Pay**: **$2,917,036**
+
+<Check>
+  The calculator performs all these computations automatically and updates in real-time as you modify shifts in the calendar.
+</Check>
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Colombian Labor Law" icon="gavel" href="/features/colombian-labor-law">
+    Divisor changes and Ley 2101
+  </Card>
+  <Card title="Interactive Calendar" icon="calendar-edit" href="/features/interactive-calendar">
+    Modify individual days
+  </Card>
+</CardGroup>

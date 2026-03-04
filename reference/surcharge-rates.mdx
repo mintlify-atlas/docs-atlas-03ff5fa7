@@ -1,0 +1,317 @@
+---
+title: Surcharge Rates Reference
+description: All surcharge multipliers and payment rates for different shift types and hours
+---
+
+## Overview
+
+Surcharge rates determine the additional payment multipliers applied to the base hourly rate for different types of work hours. These rates are based on Colombian labor law and vary by time of day, work type, and whether the day is a holiday.
+
+## Base Hourly Rate Calculation
+
+The hourly rate is calculated using a monthly divisor that changes based on the labor law transition:
+
+```javascript:index.html:596-597
+const divisor = getDivisorForDate(year, month, day);
+const hourValue = Math.round(salary / divisor);
+```
+
+### Divisor Logic (lines 387-391)
+
+```javascript
+function getDivisorForDate(year, month, day) {
+    const current = new Date(year, month - 1, day).getTime();
+    const transition = new Date(2026, 6, 15).getTime(); 
+    return (current >= transition) ? 210 : 220;
+}
+```
+
+**Divisor Schedule:**
+- **Before July 15, 2026:** 220 hours/month (47-hour workweek - Ley 2101)
+- **From July 15, 2026 onward:** 210 hours/month (46-hour workweek reduction)
+
+**Calculation:**
+```
+Hourly Rate = Base Salary ÷ Divisor
+```
+
+**Example:**
+- Base Salary: $1,750,905
+- Divisor: 220 (before July 15, 2026)
+- **Hourly Rate = $1,750,905 ÷ 220 = $7,959**
+
+---
+
+## Standard Surcharge Rates
+
+### 1. Ordinary Hour (1.0x)
+
+**Multiplier:** 1.0x (Base rate)
+
+**Application:**
+- Regular daytime hours (8 hours for rest/leave days)
+- Base component of all shift calculations
+
+**Formula:**
+```
+Ordinary Pay = Hours × Hourly Rate × 1.0
+```
+
+**Example:**
+- 8 hours × $7,959 × 1.0 = **$63,672**
+
+---
+
+### 2. Night Surcharge (0.35x)
+
+**Multiplier:** 0.35x (35% surcharge)
+
+**Application:**
+- Applied to nighttime hours (typically 7 hours in a 12-hour night shift)
+- Added ON TOP of base pay for those hours
+
+**Source Code (lines 618-620):**
+```javascript
+details.basic = (1 * hourValue) + (7 * hourValue);
+details.recargo = (7 * hourValue * 0.35);
+```
+
+**Formula:**
+```
+Night Surcharge = Night Hours × Hourly Rate × 0.35
+```
+
+**Example:**
+- 7 hours × $7,959 × 0.35 = **$19,501**
+
+**Display Rate:**
+- Per Hour Rate = $7,959 × 0.35 = **$2,786 per hour**
+
+---
+
+### 3. Daytime Extra Hours (1.25x)
+
+**Multiplier:** 1.25x (125% of base rate)
+
+**Application:**
+- Extra hours worked during daytime shifts (typically 4 hours)
+- Used in Day Shift (D) calculations
+
+**Source Code (line 615):**
+```javascript
+details.extra = 4 * hourValue * 1.25;
+```
+
+**Formula:**
+```
+Daytime Extra = Extra Hours × Hourly Rate × 1.25
+```
+
+**Example:**
+- 4 hours × $7,959 × 1.25 = **$39,795**
+
+**Display Rate:**
+- Per Hour Rate = $7,959 × 1.25 = **$9,949 per hour**
+
+---
+
+### 4. Nighttime Extra Hours (1.75x)
+
+**Multiplier:** 1.75x (175% of base rate)
+
+**Application:**
+- Extra hours worked during nighttime shifts (typically 4 hours)
+- Used in Night Shift (N) calculations
+
+**Source Code (line 620):**
+```javascript
+details.extra = (4 * hourValue * 1.75);
+```
+
+**Formula:**
+```
+Nighttime Extra = Extra Hours × Hourly Rate × 1.75
+```
+
+**Example:**
+- 4 hours × $7,959 × 1.75 = **$55,714**
+
+**Display Rate:**
+- Per Hour Rate = $7,959 × 1.75 = **$13,928 per hour**
+
+---
+
+## Holiday/Festive Surcharge Rates
+
+### Festival Surcharge Logic (lines 393-397)
+
+```javascript
+function getFestiveSurcharge(year, month, day) {
+    const current = new Date(year, month - 1, day).getTime();
+    const transition2026 = new Date(2026, 6, 1).getTime(); 
+    return (current >= transition2026) ? 0.90 : 0.80;
+}
+```
+
+**Festival Rate Schedule:**
+- **Before July 1, 2026:** 0.80 (80% surcharge)
+- **From July 1, 2026 onward:** 0.90 (90% surcharge)
+
+---
+
+### 5. Holiday Work Base (1.8x / 1.9x)
+
+**Multiplier:** 
+- **Before July 1, 2026:** 1.0 + 0.80 = 1.80x
+- **After July 1, 2026:** 1.0 + 0.90 = 1.90x
+
+**Application:**
+- Base 8 hours worked on holidays/rest days
+- Combined base + holiday surcharge
+
+**Source Code (line 625):**
+```javascript
+const valBaseFest = 8 * hourValue * (1 + festSurcharge);
+```
+
+**Formula:**
+```
+Holiday Base = 8 hours × Hourly Rate × (1 + Festival Rate)
+```
+
+**Examples:**
+
+**Before July 1, 2026:**
+- 8 hours × $7,959 × 1.80 = **$114,610**
+
+**After July 1, 2026:**
+- 8 hours × $7,959 × 1.90 = **$120,977**
+
+---
+
+### 6. Holiday Daytime Extra (2.05x / 2.15x)
+
+**Multiplier:**
+- **Before July 1, 2026:** 1.25 + 0.80 = 2.05x
+- **After July 1, 2026:** 1.25 + 0.90 = 2.15x
+
+**Application:**
+- Extra daytime hours on holidays (typically 4 hours)
+- Combines daytime extra (1.25x) + festival surcharge
+
+**Source Code (line 626):**
+```javascript
+const valExtraFest = 4 * hourValue * (1.25 + festSurcharge);
+```
+
+**Formula:**
+```
+Holiday Daytime Extra = Extra Hours × Hourly Rate × (1.25 + Festival Rate)
+```
+
+**Examples:**
+
+**Before July 1, 2026:**
+- 4 hours × $7,959 × 2.05 = **$65,242**
+
+**After July 1, 2026:**
+- 4 hours × $7,959 × 2.15 = **$68,467**
+
+---
+
+### 7. Holiday Nighttime Extra (2.55x / 2.65x)
+
+**Multiplier:**
+- **Before July 1, 2026:** 1.75 + 0.80 = 2.55x
+- **After July 1, 2026:** 1.75 + 0.90 = 2.65x
+
+**Application:**
+- Extra nighttime hours on holidays
+- Combines nighttime extra (1.75x) + festival surcharge
+- **Note:** While displayed in UI, not currently used in shift calculations
+
+**Formula:**
+```
+Holiday Nighttime Extra = Extra Hours × Hourly Rate × (1.75 + Festival Rate)
+```
+
+**Examples:**
+
+**Before July 1, 2026:**
+- 4 hours × $7,959 × 2.55 = **$81,181**
+
+**After July 1, 2026:**
+- 4 hours × $7,959 × 2.65 = **$84,363**
+
+---
+
+## Rate Comparison Table
+
+### Before July 1, 2026 (Divisor 220, Festival 0.80)
+
+| Rate Type | Multiplier | Per Hour | 4 Hours | 8 Hours |
+|-----------|-----------|----------|---------|----------|
+| Ordinary | 1.00x | $7,959 | $31,836 | $63,672 |
+| Night Surcharge | 0.35x | $2,786 | $11,144 | $22,288 |
+| Day Extra | 1.25x | $9,949 | $39,795 | $79,590 |
+| Night Extra | 1.75x | $13,928 | $55,714 | $111,429 |
+| Holiday Base | 1.80x | $14,326 | $57,304 | $114,610 |
+| Holiday Day Extra | 2.05x | $16,316 | $65,242 | $130,484 |
+| Holiday Night Extra | 2.65x | $21,091 | $84,363 | $168,726 |
+
+### After July 1, 2026 (Divisor 210, Festival 0.90)
+
+| Rate Type | Multiplier | Per Hour | 4 Hours | 8 Hours |
+|-----------|-----------|----------|---------|----------|
+| Ordinary | 1.00x | $8,338 | $33,352 | $66,705 |
+| Night Surcharge | 0.35x | $2,918 | $11,673 | $23,347 |
+| Day Extra | 1.25x | $10,423 | $41,690 | $83,381 |
+| Night Extra | 1.75x | $14,592 | $58,367 | $116,734 |
+| Holiday Base | 1.90x | $15,843 | $63,372 | $126,744 |
+| Holiday Day Extra | 2.15x | $17,927 | $71,707 | $143,414 |
+| Holiday Night Extra | 2.65x | $22,096 | $88,386 | $176,772 |
+
+*Based on base salary of $1,750,905*
+
+---
+
+## Educational Display (UI)
+
+The calculator displays current rates in the "Guía de Tarifas y Recargos" section (lines 706-735):
+
+```javascript:index.html:727-734
+document.getElementById('rate-ord').innerText = formatMoney(hourVal);
+document.getElementById('rate-rec-noc').innerText = formatMoney(hourVal * 0.35);
+document.getElementById('rate-ext-diu').innerText = formatMoney(hourVal * 1.25);
+document.getElementById('rate-ext-noc').innerText = formatMoney(hourVal * 1.75);
+
+document.getElementById('rate-rec-dom').innerText = formatMoney(hourVal * (1 + festPct));
+document.getElementById('rate-ext-dom-diu').innerText = formatMoney(hourVal * (1.25 + festPct));
+document.getElementById('rate-ext-dom-noc').innerText = formatMoney(hourVal * (1.75 + festPct));
+```
+
+These rates update automatically when:
+- Base salary changes
+- Month/year selection changes (affects divisor)
+- Crossing transition dates
+
+---
+
+## Legal References
+
+**Divisor Changes:**
+- **Ley 2101 de 2021:** Gradual reduction of workweek hours
+- **220 hours:** 47-hour workweek standard
+- **210 hours:** 46-hour workweek (July 15, 2026 transition)
+
+**Festival Surcharge:**
+- Standard Colombian labor law holiday rates
+- Transition from 80% to 90% on July 1, 2026
+
+---
+
+## Related References
+
+- [Shift Types](/reference/shift-types) - How rates apply to different shifts
+- [Calculations](/reference/calculations) - Complete calculation formulas
+- [Deductions](/reference/deductions) - Post-calculation deductions

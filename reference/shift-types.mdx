@@ -1,0 +1,260 @@
+---
+title: Shift Types Reference
+description: Complete reference of all 6 shift types with their labels, CSS classes, and payment calculations
+---
+
+## Overview
+
+Calculadora Vigilancia supports 6 distinct shift types, each with specific payment calculations and visual styling. The shift configuration is defined in `stateConfig` (lines 407-414).
+
+## Shift Type Configuration
+
+### Source Code Extract
+
+```javascript:index.html:407-414
+const stateConfig = {
+    'D': { label: 'Diurno', class: 'cell-diurno' },
+    'N': { label: 'Nocturno', class: 'cell-nocturno' },
+    'X': { label: 'Descanso', class: 'cell-descanso' },
+    'E': { label: 'Extra/Fest', class: 'cell-extra' },
+    'P': { label: 'Permiso', class: 'cell-permiso' },
+    'A': { label: 'Ausencia', class: 'cell-ausencia' }
+};
+```
+
+## Complete Shift Types
+
+### D - Diurno (Day Shift)
+
+**Configuration:**
+- **Code:** `D`
+- **Label:** Diurno
+- **CSS Class:** `cell-diurno`
+- **Color Scheme:** Yellow background (`#fff3cd`), dark yellow text (`#533f03`)
+- **Icon:** ☀️
+
+**Payment Calculation:**
+```javascript
+case 'D': // Diurno
+    total = (8 * hourValue) + (4 * hourValue * 1.25);
+    details.basic = 8 * hourValue;
+    details.extra = 4 * hourValue * 1.25;
+    break;
+```
+
+**Formula:**
+- **Basic Pay:** 8 hours × Hourly Rate
+- **Extra Hours:** 4 hours × Hourly Rate × 1.25 (daytime extra)
+- **Total:** Basic + Extra
+
+**Example** (Salary $1,750,905, Divisor 220):
+- Hourly Rate = $7,959
+- Basic = 8 × $7,959 = $63,672
+- Extra = 4 × $7,959 × 1.25 = $39,795
+- **Total = $103,467**
+
+---
+
+### N - Nocturno (Night Shift)
+
+**Configuration:**
+- **Code:** `N`
+- **Label:** Nocturno
+- **CSS Class:** `cell-nocturno`
+- **Color Scheme:** Light blue background (`#d1ecf1`), dark blue text (`#0c5460`)
+- **Icon:** 🌑
+
+**Payment Calculation:**
+```javascript
+case 'N': // Nocturno
+    details.basic = (1 * hourValue) + (7 * hourValue);
+    details.recargo = (7 * hourValue * 0.35);
+    details.extra = (4 * hourValue * 1.75);
+    total = details.basic + details.recargo + details.extra;
+    break;
+```
+
+**Formula:**
+- **Basic Pay:** 8 hours × Hourly Rate (1 hour daytime + 7 hours nighttime)
+- **Night Surcharge:** 7 hours × Hourly Rate × 0.35
+- **Extra Night Hours:** 4 hours × Hourly Rate × 1.75
+- **Total:** Basic + Night Surcharge + Extra
+
+**Example** (Salary $1,750,905, Divisor 220):
+- Hourly Rate = $7,959
+- Basic = 8 × $7,959 = $63,672
+- Night Surcharge = 7 × $7,959 × 0.35 = $19,501
+- Extra Night = 4 × $7,959 × 1.75 = $55,714
+- **Total = $138,887**
+
+---
+
+### X - Descanso (Rest Day)
+
+**Configuration:**
+- **Code:** `X`
+- **Label:** Descanso
+- **CSS Class:** `cell-descanso`
+- **Color Scheme:** Light green background (`#d4edda`), dark green text (`#155724`)
+- **Icon:** 🟢
+
+**Payment Calculation:**
+```javascript
+case 'X': // Descanso
+case 'P': // Permiso
+    total = 8 * hourValue; 
+    details.basic = total;
+    break;
+```
+
+**Formula:**
+- **Basic Pay:** 8 hours × Hourly Rate
+- **No surcharges or extras**
+
+**Example** (Salary $1,750,905, Divisor 220):
+- Hourly Rate = $7,959
+- **Total = 8 × $7,959 = $63,672**
+
+---
+
+### E - Extra/Festivo (Holiday/Extra Work)
+
+**Configuration:**
+- **Code:** `E`
+- **Label:** Extra/Fest
+- **CSS Class:** `cell-extra`
+- **Color Scheme:** Orange background (`#ffe0b2`), dark orange text (`#e65100`)
+- **Icon:** 🟠
+
+**Payment Calculation:**
+```javascript
+case 'E': // Extra/Festivo
+    const valBaseFest = 8 * hourValue * (1 + festSurcharge);
+    const valExtraFest = 4 * hourValue * (1.25 + festSurcharge);
+    total = valBaseFest + valExtraFest;
+    details.basic = 8 * hourValue;
+    details.recargo = (8 * hourValue * festSurcharge);
+    details.extra = valExtraFest; 
+    break;
+```
+
+**Formula:**
+- **Basic Pay:** 8 hours × Hourly Rate
+- **Holiday Surcharge:** 8 hours × Hourly Rate × Festival Rate
+- **Extra Holiday Hours:** 4 hours × Hourly Rate × (1.25 + Festival Rate)
+- **Total:** Basic + Holiday Surcharge + Extra
+
+**Festival Rate** (varies by date):
+- Before July 1, 2026: 0.80 (80%)
+- After July 1, 2026: 0.90 (90%)
+
+**Example** (Salary $1,750,905, Divisor 220, Festival Rate 0.90):
+- Hourly Rate = $7,959
+- Basic = 8 × $7,959 = $63,672
+- Holiday Surcharge = 8 × $7,959 × 0.90 = $57,305
+- Extra = 4 × $7,959 × (1.25 + 0.90) = $68,467
+- **Total = $189,444**
+
+---
+
+### P - Permiso (Paid Leave)
+
+**Configuration:**
+- **Code:** `P`
+- **Label:** Permiso
+- **CSS Class:** `cell-permiso`
+- **Color Scheme:** Purple background (`#e8daef`), dark purple text (`#6c3483`)
+- **Icon:** 🟣
+
+**Payment Calculation:**
+```javascript
+case 'X': // Descanso
+case 'P': // Permiso
+    total = 8 * hourValue; 
+    details.basic = total;
+    break;
+```
+
+**Formula:**
+- **Basic Pay:** 8 hours × Hourly Rate
+- **Same as Rest Day (X)**
+
+**Example** (Salary $1,750,905, Divisor 220):
+- Hourly Rate = $7,959
+- **Total = 8 × $7,959 = $63,672**
+
+---
+
+### A - Ausencia (Unpaid Absence)
+
+**Configuration:**
+- **Code:** `A`
+- **Label:** Ausencia
+- **CSS Class:** `cell-ausencia`
+- **Color Scheme:** Light red background (`#fadbd8`), dark red text (`#922b21`)
+- **Icon:** 🔴
+
+**Payment Calculation:**
+```javascript
+case 'A': // Ausencia
+    total = 0;
+    break;
+```
+
+**Formula:**
+- **No payment for this day**
+- **Affects monthly totals** (reduces days paid in commercial month mode)
+
+**Impact on Monthly Calculation:**
+- In Commercial Month mode: `(Salary / 30) × (30 - Absences)`
+- Absence days are subtracted from total paid days
+
+---
+
+## Shift Patterns
+
+Calculadora Vigilancia includes predefined shift patterns (lines 399-404):
+
+```javascript
+const patterns = {
+    '2D2N2X': ['D', 'D', 'N', 'N', 'X', 'X'],  // Rotating pattern
+    '4D2X': ['D', 'D', 'D', 'D', 'X', 'X'],    // 4 days, 2 rest
+    '4N2X': ['N', 'N', 'N', 'N', 'X', 'X'],    // 4 nights, 2 rest
+    'MANUAL': ['X']                              // Manual assignment
+};
+```
+
+### Pattern Application
+
+Patterns repeat cyclically based on the cycle start date:
+
+```javascript:index.html:440-449
+for (let day = 1; day <= daysInMonth; day++) {
+    if(patternKey === 'MANUAL') {
+        dayStates[day] = 'X'; continue;
+    }
+    const currentObj = new Date(year, month - 1, day);
+    const diffTime = currentObj - cycleStartDate;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    let patternIndex = diffDays % pattern.length;
+    if (patternIndex < 0) patternIndex = pattern.length + patternIndex;
+    dayStates[day] = pattern[patternIndex];
+}
+```
+
+## Visual Styling
+
+| Shift | Background | Text Color | Usage |
+|-------|-----------|------------|-------|
+| D (Diurno) | `#fff3cd` (Yellow) | `#533f03` | Day shifts |
+| N (Nocturno) | `#d1ecf1` (Blue) | `#0c5460` | Night shifts |
+| X (Descanso) | `#d4edda` (Green) | `#155724` | Rest days |
+| E (Extra/Fest) | `#ffe0b2` (Orange) | `#e65100` | Holiday work |
+| P (Permiso) | `#e8daef` (Purple) | `#6c3483` | Paid leave |
+| A (Ausencia) | `#fadbd8` (Red) | `#922b21` | Absences |
+
+## Related References
+
+- [Surcharge Rates](/reference/surcharge-rates) - Detailed multiplier rates
+- [Deductions](/reference/deductions) - Health and pension calculations
+- [Calculations](/reference/calculations) - Complete mathematical formulas

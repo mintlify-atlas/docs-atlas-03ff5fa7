@@ -1,0 +1,134 @@
+---
+title: Setting Up Salary
+description: Configure base salary, transport allowance, and understand how divisors affect your calculations
+---
+
+The salary configuration is the foundation of all payroll calculations in Calculadora Vigilancia. This guide explains how to set up the base salary and transport allowance, and how the system uses divisors to calculate hourly rates.
+
+## Default Values
+
+The calculator comes pre-configured with standard Colombian security guard compensation:
+
+- **Base Salary**: $1,750,905 COP
+- **Transport Allowance**: $249,095 COP
+
+These values are set in the controls panel when you first load the application (index.html:201-206).
+
+## Configuring Salary
+
+<Steps>
+  <Step title="Enter Base Salary">
+    Click on the "Salario Básico" input field and enter the employee's base monthly salary. The field automatically formats the number with thousand separators (e.g., 1.750.905).
+    
+    ```javascript
+    function formatCurrency(input) {
+        let value = input.value.replace(/\D/g, '');
+        if(value !== '') {
+            input.value = new Intl.NumberFormat('es-CO').format(value);
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Enter Transport Allowance">
+    In the "Auxilio Transporte" field, enter the transport subsidy amount. This is typically a fixed value set by Colombian labor law.
+  </Step>
+  
+  <Step title="Automatic Recalculation">
+    The calculator automatically recalculates all values when you change the salary. This triggers the `fullRecalculate()` function which updates:
+    - Hourly rates
+    - Daily shift values
+    - Total earnings
+    - Deductions
+  </Step>
+</Steps>
+
+<Info>
+  The calculator uses Colombian number formatting (es-CO locale) with periods as thousand separators and commas for decimals.
+</Info>
+
+## Understanding Divisors
+
+The divisor determines how many hours are used to calculate the hourly rate from the monthly salary. The calculator automatically selects the correct divisor based on Colombian labor law changes:
+
+### Divisor Logic
+
+```javascript
+function getDivisorForDate(year, month, day) {
+    const current = new Date(year, month - 1, day).getTime();
+    const transition = new Date(2026, 6, 15).getTime(); 
+    return (current >= transition) ? 210 : 220;
+}
+```
+
+**Divisor Schedule:**
+
+| Period | Divisor | Legal Basis |
+|--------|---------|-------------|
+| Before July 15, 2026 | 220 hours | Ley 2101 de 2021 (47-hour workweek) |
+| After July 15, 2026 | 210 hours | Workweek reduction (46-hour workweek) |
+
+### Hourly Rate Calculation
+
+The hourly rate is calculated by dividing the base salary by the divisor:
+
+**Formula:**
+```
+Hourly Rate = Base Salary ÷ Divisor
+```
+
+**Example with default values:**
+- Base Salary: $1,750,905
+- Divisor (before July 2026): 220 hours
+- **Hourly Rate: $7,959**
+
+```javascript
+const hourValue = Math.round(salary / divisor);
+```
+
+## How the Calculator Retrieves Values
+
+The `getRawMoney()` function extracts numeric values from formatted currency fields:
+
+```javascript
+function getRawMoney(elementId) {
+    const val = document.getElementById(elementId).value;
+    return parseInt(val.replace(/\./g, '')) || 0;
+}
+```
+
+This removes formatting dots and converts the string to an integer for calculations.
+
+## Commercial Month Adjustment
+
+The calculator offers two calculation modes:
+
+<Tip>
+  Enable "Ajustar a Mes Comercial (30 días)" to use standardized 30-day months for easier payroll calculations. Disable it to calculate based on actual calendar days (28-31 days).
+</Tip>
+
+**Commercial Mode (30 days):**
+- Daily rate = Base Salary ÷ 30
+- Days to pay = 30 - Absences
+- Transport = (Transport Allowance ÷ 30) × Days to pay
+
+**Real Days Mode:**
+- Calculates based on actual worked days
+- Sums daily basic values
+- May show higher values for 31-day months
+
+This is configured with the checkbox at index.html:242-244 and affects calculations in the `recalculate()` function (lines 668-680).
+
+## Best Practices
+
+<Info>
+  Always verify that the base salary matches the employee's contract and current minimum wage regulations.
+</Info>
+
+<Tip>
+  The transport allowance is subject to annual adjustments by the Colombian government. Update this value at the beginning of each year.
+</Tip>
+
+<Info>
+  When the divisor changes on July 15, 2026, the calculator will automatically use the new 210-hour divisor for dates on or after that transition date.
+</Info>

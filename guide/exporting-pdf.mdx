@@ -1,0 +1,315 @@
+---
+title: Exporting PDF Reports
+description: How to generate and download professional PDF payroll reports with detailed breakdowns
+---
+
+The calculator includes a comprehensive PDF export feature that generates professional payroll reports with complete breakdowns of earnings, deductions, and daily attendance details.
+
+## Generating a PDF Report
+
+<Steps>
+  <Step title="Complete Your Configuration">
+    Before generating the PDF, ensure you have:
+    - Set the correct base salary and transport allowance
+    - Selected the appropriate month and year
+    - Generated the calendar with the correct shift pattern
+    - Made any necessary manual adjustments to individual days
+  </Step>
+  
+  <Step title="Click Download PDF">
+    Click the red "Descargar PDF" button in the controls panel. The calculator will automatically recalculate all values before generating the report.
+  </Step>
+  
+  <Step title="Save the File">
+    Your browser will download a file named `Nomina_[Month]_[Year].pdf` (e.g., `Nomina_Marzo_2026.pdf`).
+  </Step>
+</Steps>
+
+<Info>
+  The PDF generation uses the jsPDF library with the autoTable plugin for professional table formatting.
+</Info>
+
+## PDF Report Structure
+
+The generated PDF contains three main sections:
+
+### 1. Header
+
+- **Title**: "Volante de Nómina" (Payroll Voucher)
+- **Period**: Month and year
+- **Base Salary**: Formatted salary amount
+
+### 2. Summary Table
+
+A financial summary showing:
+
+**Earnings (Devengados):**
+- Valor Turnos Trabajados (Worked shifts value)
+- Auxilio de Transporte (Transport allowance)
+
+**Deductions (Deducciones):**
+- Aporte Salud 4% (Health contribution)
+- Aporte Pensión 4% (Pension contribution)
+
+**Totals:**
+- Total Devengados (Total earnings)
+- Total Deducciones (Total deductions)
+- **NETO A PAGAR** (Net pay) - highlighted in dark blue
+
+### 3. Attendance Detail Table
+
+A complete day-by-day breakdown with columns:
+
+| Column | Description |
+|--------|-------------|
+| **Día** | Day number (1-31) |
+| **Novedad** | Shift type (Diurno, Nocturno, Descanso, etc.) |
+| **Div** | Divisor used for that day (210 or 220) |
+| **Básico** | Basic pay for the day |
+| **Recargos** | Surcharges (night, festive) |
+| **Extras** | Overtime pay |
+| **Total** | Total pay for the day |
+
+## PDF Generation Code
+
+The `generatePDF()` function (index.html:737-810) handles the complete PDF generation:
+
+```javascript
+function generatePDF() {
+    recalculate(); 
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    const year = document.getElementById('selYear').value;
+    const month = document.getElementById('selMonth').options[
+        document.getElementById('selMonth').selectedIndex
+    ].text;
+    const salary = document.getElementById('baseSalary').value;
+
+    // Header
+    doc.setFontSize(18);
+    doc.text("Volante de Nómina", 105, 15, null, null, "center");
+    doc.setFontSize(10);
+    doc.text(`Periodo: ${month} ${year} | Salario Base: $${salary}`, 
+             105, 22, null, null, "center");
+
+    // Get summary values
+    const totalTurnos = document.getElementById('valTotalTurnos').innerText;
+    const auxTrans = document.getElementById('valTransporte').innerText;
+    const totalDev = document.getElementById('totalDevengado').innerText;
+    const salud = document.getElementById('dedSalud').innerText;
+    const pension = document.getElementById('dedPension').innerText;
+    const totalDed = document.getElementById('totalDeducciones').innerText;
+    const neto = document.getElementById('netPay').innerText;
+
+    // Summary table
+    doc.autoTable({
+        startY: 30,
+        head: [['Concepto', 'Devengados', 'Deducciones']],
+        body: [
+            ['Valor Turnos Trabajados', totalTurnos, ''],
+            ['Auxilio de Transporte', auxTrans, ''],
+            ['Aporte Salud (4%)', '', salud],
+            ['Aporte Pensión (4%)', '', pension],
+            ['TOTALES', totalDev, totalDed],
+            [{
+                content: 'NETO A PAGAR: ' + neto, 
+                colSpan: 3, 
+                styles: {
+                    halign: 'center', 
+                    fontSize: 14, 
+                    fillColor: [44, 62, 80], 
+                    textColor: 255
+                }
+            }]
+        ],
+        theme: 'grid',
+        headStyles: { fillColor: [44, 62, 80] },
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } }
+    });
+
+    // Build attendance detail rows
+    let rows = [];
+    const stateLabels = { 
+        'D': 'Diurno', 
+        'N': 'Nocturno', 
+        'X': 'Descanso', 
+        'E': 'Extra/Fest', 
+        'P': 'Permiso', 
+        'A': 'Ausencia' 
+    };
+    
+    const yrInt = parseInt(year);
+    const moInt = parseInt(document.getElementById('selMonth').value);
+
+    for (let day = 1; day < dayStates.length; day++) {
+        const state = dayStates[day];
+        const divisor = getDivisorForDate(yrInt, moInt, day);
+        const comps = calculateDayComponents(state, yrInt, moInt, day);
+        
+        rows.push([
+            day,
+            stateLabels[state],
+            divisor, 
+            formatMoney(comps.basic),
+            formatMoney(comps.recargo),
+            formatMoney(comps.extra),
+            formatMoney(comps.total)
+        ]);
+    }
+
+    // Attendance detail table
+    doc.text("Detalle de Asistencia", 14, doc.lastAutoTable.finalY + 10);
+
+    doc.autoTable({
+        startY: doc.lastAutoTable.finalY + 15,
+        head: [['Dia', 'Novedad', 'Div', 'Basico', 'Recargos', 'Extras', 'Total']],
+        body: rows,
+        theme: 'striped',
+        headStyles: { fillColor: [39, 174, 96] },
+        styles: { fontSize: 8, halign: 'right' },
+        columnStyles: { 0: { halign: 'center' }, 1: { halign: 'left' } }
+    });
+
+    // Save the file
+    doc.save(`Nomina_${month}_${year}.pdf`);
+}
+```
+
+## Key Features
+
+### Automatic Recalculation
+
+```javascript
+recalculate();
+```
+
+The first line ensures all calculations are current before PDF generation, even if the user made recent changes.
+
+### Dynamic File Naming
+
+```javascript
+doc.save(`Nomina_${month}_${year}.pdf`);
+```
+
+Files are automatically named with the period information:
+- Nomina_Enero_2026.pdf
+- Nomina_Febrero_2026.pdf
+- etc.
+
+### Professional Formatting
+
+The PDF uses professional styling:
+
+**Color Scheme:**
+- Header tables: Dark blue `[44, 62, 80]`
+- Detail table headers: Green `[39, 174, 96]`
+- Net pay highlight: White text on dark blue background
+
+**Table Themes:**
+- Summary: Grid theme with borders
+- Detail: Striped theme for readability
+
+**Alignment:**
+- Money values: Right-aligned
+- Day numbers: Center-aligned
+- Labels: Left-aligned
+
+### Detailed Daily Breakdown
+
+Each day includes the divisor used for calculation, allowing verification of rate changes during transition periods:
+
+```javascript
+const divisor = getDivisorForDate(yrInt, moInt, day);
+const comps = calculateDayComponents(state, yrInt, moInt, day);
+
+rows.push([
+    day,
+    stateLabels[state],
+    divisor,  // Shows 220 or 210 based on date
+    formatMoney(comps.basic),
+    formatMoney(comps.recargo),
+    formatMoney(comps.extra),
+    formatMoney(comps.total)
+]);
+```
+
+<Info>
+  The divisor column in the detail table is especially useful during transition periods (e.g., July 2026) when the divisor changes mid-month.
+</Info>
+
+## PDF Output Example
+
+**Header:**
+```
+             Volante de Nómina
+    Periodo: Marzo 2026 | Salario Base: $1.750.905
+```
+
+**Summary Table:**
+```
+┌────────────────────────┬──────────────┬──────────────┐
+│ Concepto               │ Devengados   │ Deducciones  │
+├────────────────────────┼──────────────┼──────────────┤
+│ Valor Turnos Trabajados│ $ 2.580.000  │              │
+│ Auxilio de Transporte  │ $ 249.095    │              │
+│ Aporte Salud (4%)      │              │ $ 103.200    │
+│ Aporte Pensión (4%)    │              │ $ 103.200    │
+│ TOTALES                │ $ 2.829.095  │ $ 206.400    │
+├────────────────────────┴──────────────┴──────────────┤
+│          NETO A PAGAR: $ 2.622.695                   │
+└──────────────────────────────────────────────────────┘
+```
+
+**Detail Table (excerpt):**
+```
+┌────┬──────────┬─────┬──────────┬──────────┬──────────┬──────────┐
+│Día │ Novedad  │ Div │ Basico   │ Recargos │ Extras   │ Total    │
+├────┼──────────┼─────┼──────────┼──────────┼──────────┼──────────┤
+│ 1  │ Diurno   │ 220 │ $ 63.672 │ $ 0      │ $ 39.795 │ $ 103.467│
+│ 2  │ Diurno   │ 220 │ $ 63.672 │ $ 0      │ $ 39.795 │ $ 103.467│
+│ 3  │ Nocturno │ 220 │ $ 63.672 │ $ 19.500 │ $ 55.713 │ $ 138.885│
+│ 4  │ Nocturno │ 220 │ $ 63.672 │ $ 19.500 │ $ 55.713 │ $ 138.885│
+│ 5  │ Descanso │ 220 │ $ 63.672 │ $ 0      │ $ 0      │ $ 63.672 │
+│ 6  │ Descanso │ 220 │ $ 63.672 │ $ 0      │ $ 0      │ $ 63.672 │
+└────┴──────────┴─────┴──────────┴──────────┴──────────┴──────────┘
+```
+
+## Best Practices
+
+<Tip>
+  Always generate the PDF after making final adjustments. The PDF captures a snapshot of the current state and doesn't update if you make changes afterward.
+</Tip>
+
+<Tip>
+  Review the PDF before sharing with employees or submitting to accounting. Verify that:
+  - The period is correct
+  - All shift types are accurate
+  - The net pay matches expectations
+  - Absences are properly reflected
+</Tip>
+
+<Info>
+  The PDF uses the browser's built-in print capabilities. Ensure you're using a modern browser (Chrome, Firefox, Edge, Safari) for best results.
+</Info>
+
+<Tip>
+  Keep PDF records organized by employee and period. The automatic filename format (Nomina_Month_Year.pdf) makes it easy to create a chronological filing system.
+</Tip>
+
+## Troubleshooting
+
+**PDF appears blank:**
+- Ensure you've generated the calendar before exporting
+- Check that the base salary is entered correctly
+
+**Values look incorrect:**
+- The PDF generation triggers a recalculation first, but double-check your salary and shift configurations
+
+**Browser blocks download:**
+- Check your browser's download settings
+- Allow downloads from the calculator application
+
+<Info>
+  The PDF libraries (jsPDF and autoTable) are loaded via CDN from index.html:7-8. Ensure you have an internet connection when first loading the calculator.
+</Info>

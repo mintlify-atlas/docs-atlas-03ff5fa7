@@ -1,0 +1,648 @@
+---
+title: Complete Calculation Formulas
+description: Mathematical formulas and logic for all payroll calculations in Calculadora Vigilancia
+---
+
+## Overview
+
+This reference documents the complete mathematical formulas and calculation logic used in Calculadora Vigilancia. All calculations are based on Colombian labor law for security guard payroll.
+
+---
+
+## Core Calculation Functions
+
+### 1. Hourly Rate Calculation
+
+**Function:** `getDivisorForDate()` (lines 387-391)
+
+```javascript
+function getDivisorForDate(year, month, day) {
+    const current = new Date(year, month - 1, day).getTime();
+    const transition = new Date(2026, 6, 15).getTime(); 
+    return (current >= transition) ? 210 : 220;
+}
+```
+
+**Formula:**
+```
+if date >= July 15, 2026:
+    Divisor = 210 hours/month
+else:
+    Divisor = 220 hours/month
+
+Hourly Rate = Base Salary ÷ Divisor
+```
+
+**Example:**
+- Base Salary: $1,750,905
+- Date: March 2026 (before transition)
+- Divisor: 220
+- **Hourly Rate = $1,750,905 ÷ 220 = $7,959**
+
+---
+
+### 2. Festival Surcharge Rate
+
+**Function:** `getFestiveSurcharge()` (lines 393-397)
+
+```javascript
+function getFestiveSurcharge(year, month, day) {
+    const current = new Date(year, month - 1, day).getTime();
+    const transition2026 = new Date(2026, 6, 1).getTime(); 
+    return (current >= transition2026) ? 0.90 : 0.80;
+}
+```
+
+**Formula:**
+```
+if date >= July 1, 2026:
+    Festival Surcharge = 0.90 (90%)
+else:
+    Festival Surcharge = 0.80 (80%)
+```
+
+---
+
+## Daily Calculation Components
+
+### Main Function: `calculateDayComponents()`
+
+**Location:** Lines 594-634
+
+```javascript
+function calculateDayComponents(type, year, month, day) {
+    const salary = getRawMoney('baseSalary');
+    const divisor = getDivisorForDate(year, month, day);
+    const hourValue = Math.round(salary / divisor);
+    const festSurcharge = getFestiveSurcharge(year, month, day);
+
+    let total = 0;
+    let details = { basic: 0, recargo: 0, extra: 0 };
+
+    switch(type) {
+        // ... calculation cases
+    }
+    
+    return { total, ...details };
+}
+```
+
+**Returns:**
+- `total`: Total payment for the day
+- `basic`: Basic hours payment
+- `recargo`: Surcharge amount (night, holiday)
+- `extra`: Extra hours payment
+
+---
+
+### Type D: Diurno (Day Shift)
+
+**Code:** Lines 612-616
+
+```javascript
+case 'D': // Diurno
+    total = (8 * hourValue) + (4 * hourValue * 1.25);
+    details.basic = 8 * hourValue;
+    details.extra = 4 * hourValue * 1.25;
+    break;
+```
+
+**Formula:**
+```
+Basic Pay = 8 hours × Hourly Rate
+Extra Pay = 4 hours × Hourly Rate × 1.25
+Total = Basic Pay + Extra Pay
+```
+
+**Mathematical Expression:**
+```
+Total = (8 × HR) + (4 × HR × 1.25)
+      = 8HR + 5HR
+      = 13HR
+```
+
+**Example:**
+- Hourly Rate (HR): $7,959
+- Basic: 8 × $7,959 = $63,672
+- Extra: 4 × $7,959 × 1.25 = $39,795
+- **Total = $103,467** (or 13 × $7,959)
+
+---
+
+### Type N: Nocturno (Night Shift)
+
+**Code:** Lines 617-622
+
+```javascript
+case 'N': // Nocturno
+    details.basic = (1 * hourValue) + (7 * hourValue);
+    details.recargo = (7 * hourValue * 0.35);
+    details.extra = (4 * hourValue * 1.75);
+    total = details.basic + details.recargo + details.extra;
+    break;
+```
+
+**Formula:**
+```
+Basic Pay = 8 hours × Hourly Rate (1 day + 7 night)
+Night Surcharge = 7 hours × Hourly Rate × 0.35
+Extra Night Pay = 4 hours × Hourly Rate × 1.75
+Total = Basic + Surcharge + Extra
+```
+
+**Mathematical Expression:**
+```
+Total = (8 × HR) + (7 × HR × 0.35) + (4 × HR × 1.75)
+      = 8HR + 2.45HR + 7HR
+      = 17.45HR
+```
+
+**Example:**
+- Hourly Rate (HR): $7,959
+- Basic: 8 × $7,959 = $63,672
+- Night Surcharge: 7 × $7,959 × 0.35 = $19,501
+- Extra Night: 4 × $7,959 × 1.75 = $55,714
+- **Total = $138,887** (or 17.45 × $7,959)
+
+---
+
+### Type X: Descanso (Rest Day)
+
+**Code:** Lines 604-608
+
+```javascript
+case 'X': // Descanso
+case 'P': // Permiso
+    total = 8 * hourValue; 
+    details.basic = total;
+    break;
+```
+
+**Formula:**
+```
+Basic Pay = 8 hours × Hourly Rate
+Total = Basic Pay (no surcharges or extras)
+```
+
+**Mathematical Expression:**
+```
+Total = 8 × HR
+```
+
+**Example:**
+- Hourly Rate (HR): $7,959
+- **Total = 8 × $7,959 = $63,672**
+
+---
+
+### Type E: Extra/Festivo (Holiday Work)
+
+**Code:** Lines 623-631
+
+```javascript
+case 'E': // Extra/Festivo
+    const valBaseFest = 8 * hourValue * (1 + festSurcharge);
+    const valExtraFest = 4 * hourValue * (1.25 + festSurcharge);
+    total = valBaseFest + valExtraFest;
+    details.basic = 8 * hourValue;
+    details.recargo = (8 * hourValue * festSurcharge);
+    details.extra = valExtraFest; 
+    break;
+```
+
+**Formula:**
+```
+Basic Pay = 8 hours × Hourly Rate
+Holiday Surcharge = 8 hours × Hourly Rate × Festival Rate
+Extra Holiday Pay = 4 hours × Hourly Rate × (1.25 + Festival Rate)
+Total = Basic + Holiday Surcharge + Extra
+```
+
+**Mathematical Expression:**
+```
+Total = (8 × HR × (1 + FS)) + (4 × HR × (1.25 + FS))
+      = 8HR + 8HR×FS + 5HR + 4HR×FS
+      = 13HR + 12HR×FS
+
+Where FS = Festival Surcharge (0.80 or 0.90)
+```
+
+**Example (FS = 0.90):**
+- Hourly Rate (HR): $7,959
+- Basic: 8 × $7,959 = $63,672
+- Holiday Surcharge: 8 × $7,959 × 0.90 = $57,305
+- Extra: 4 × $7,959 × (1.25 + 0.90) = 4 × $7,959 × 2.15 = $68,467
+- **Total = $189,444** (or 13 × $7,959 + 12 × $7,959 × 0.90)
+
+---
+
+### Type P: Permiso (Paid Leave)
+
+**Same calculation as Rest Day (X)**
+
+**Formula:**
+```
+Total = 8 hours × Hourly Rate
+```
+
+---
+
+### Type A: Ausencia (Absence)
+
+**Code:** Lines 609-611
+
+```javascript
+case 'A': // Ausencia
+    total = 0;
+    break;
+```
+
+**Formula:**
+```
+Total = 0 (no payment)
+```
+
+---
+
+## Monthly Recalculation Logic
+
+### Main Function: `recalculate()`
+
+**Location:** Lines 636-704
+
+```javascript
+function recalculate() {
+    const year = parseInt(document.getElementById('selYear').value);
+    const month = parseInt(document.getElementById('selMonth').value);
+    const useCommercial = document.getElementById('optCommercialMonth').checked;
+    
+    let totalRecargosExtras = 0;
+    let totalBasic = 0;
+    let countAusencias = 0;
+    let countWorkedDays = 0;
+
+    // Loop through all days
+    for (let day = 1; day < dayStates.length; day++) {
+        const comps = calculateDayComponents(dayStates[day], year, month, day);
+        totalRecargosExtras += comps.recargo + comps.extra;
+        
+        if (dayStates[day] === 'A') {
+            countAusencias++;
+        } else {
+            countWorkedDays++;
+            if (!useCommercial) {
+                totalBasic += comps.basic;
+            }
+        }
+    }
+
+    // Calculate finals based on mode
+    // ... (see mode-specific calculations below)
+}
+```
+
+---
+
+### Commercial Month Mode (30 Days)
+
+**Code:** Lines 668-673
+
+```javascript
+if (useCommercial) {
+    const daysToPay = 30 - countAusencias;
+    finalBasic = Math.round((rawSalary / 30) * daysToPay);
+    finalTransport = Math.round((rawTransport / 30) * daysToPay);
+}
+```
+
+**Formula:**
+```
+Days to Pay = 30 - Number of Absences
+
+Basic Salary Component = (Base Salary ÷ 30) × Days to Pay
+Transport Allowance = (Transport ÷ 30) × Days to Pay
+
+Total Surcharges/Extras = Σ(daily recargo + daily extra) for all days
+
+Grand Total (IBC) = Basic Component + Total Surcharges/Extras
+Total Accrued = Grand Total + Transport Allowance
+```
+
+**Mathematical Expression:**
+```
+Let:
+- BS = Base Salary
+- TA = Transport Allowance  
+- A = Number of Absences
+- SRE = Sum of daily (surcharges + extras)
+
+Basic = (BS ÷ 30) × (30 - A)
+Transport = (TA ÷ 30) × (30 - A)
+IBC = Basic + SRE
+Total Accrued = IBC + Transport
+```
+
+**Example:**
+- Base Salary: $1,750,905
+- Transport: $249,095
+- Absences: 2
+- Sum Surcharges/Extras: $450,000
+
+```
+Days to Pay = 30 - 2 = 28
+
+Basic = ($1,750,905 ÷ 30) × 28 = $1,634,176
+Transport = ($249,095 ÷ 30) × 28 = $232,489
+IBC = $1,634,176 + $450,000 = $2,084,176
+Total Accrued = $2,084,176 + $232,489 = $2,316,665
+```
+
+---
+
+### Real Days Mode
+
+**Code:** Lines 674-680
+
+```javascript
+else {
+    finalBasic = Math.round(totalBasic);
+    finalTransport = Math.round((rawTransport / 30) * countWorkedDays);
+}
+```
+
+**Formula:**
+```
+Basic Component = Σ(daily basic pay) for all non-absence days
+Transport Allowance = (Transport ÷ 30) × Worked Days Count
+
+Total Surcharges/Extras = Σ(daily recargo + daily extra) for all days
+
+Grand Total (IBC) = Basic Component + Total Surcharges/Extras
+Total Accrued = Grand Total + Transport Allowance
+```
+
+**Mathematical Expression:**
+```
+Let:
+- n = number of days in month
+- basic[i] = basic pay for day i
+- recargo[i] = surcharge for day i
+- extra[i] = extra pay for day i
+- WD = worked days count
+- TA = Transport Allowance
+
+Basic = Σ(basic[i]) for i=1 to n where day[i] ≠ 'A'
+SRE = Σ(recargo[i] + extra[i]) for i=1 to n
+Transport = (TA ÷ 30) × WD
+IBC = Basic + SRE
+Total Accrued = IBC + Transport
+```
+
+**Example (31-day month, 2 absences):**
+- 29 worked days
+- Daily basic varies by shift type
+- Assume total basic from daily sum: $1,750,000
+- Surcharges/Extras: $450,000
+- Transport: $249,095
+
+```
+Basic = $1,750,000 (sum of 29 days)
+Transport = ($249,095 ÷ 30) × 29 = $240,758
+IBC = $1,750,000 + $450,000 = $2,200,000
+Total Accrued = $2,200,000 + $240,758 = $2,440,758
+```
+
+**Note:** In Real Days mode for 31-day months, the basic component can exceed the monthly base salary since it's calculated per actual day.
+
+---
+
+## Deductions Calculation
+
+**Code:** Lines 686-692
+
+```javascript
+const ibc = grandTotal; // Base for deductions
+const salud = Math.round(ibc * 0.04);
+const pension = Math.round(ibc * 0.04);
+const totalDeducciones = salud + pension;
+const neto = (grandTotal + finalTransport) - totalDeducciones;
+```
+
+**Formula:**
+```
+IBC = Grand Total (Basic + Surcharges + Extras)
+
+Health Deduction = IBC × 0.04 (4%)
+Pension Deduction = IBC × 0.04 (4%)
+Total Deductions = Health + Pension = IBC × 0.08
+
+Net Pay = (IBC + Transport) - Total Deductions
+        = Total Accrued - Total Deductions
+```
+
+**Mathematical Expression:**
+```
+Let IBC = Income Base for Contributions
+
+Health = IBC × 0.04
+Pension = IBC × 0.04
+Deductions = Health + Pension = IBC × 0.08
+
+Net = (IBC + Transport) - Deductions
+    = IBC + Transport - 0.08×IBC
+    = 0.92×IBC + Transport
+```
+
+**Complete Example:**
+- IBC: $2,084,176
+- Transport: $232,489
+
+```
+Health = $2,084,176 × 0.04 = $83,367
+Pension = $2,084,176 × 0.04 = $83,367
+Total Deductions = $166,734
+
+Net Pay = ($2,084,176 + $232,489) - $166,734
+        = $2,316,665 - $166,734
+        = $2,149,931
+```
+
+---
+
+## Complete Monthly Calculation Flow
+
+### Step-by-Step Process
+
+**1. Initialize Counters**
+```javascript
+let totalRecargosExtras = 0;
+let totalBasic = 0;
+let countAusencias = 0;
+let countWorkedDays = 0;
+```
+
+**2. Loop Through All Days**
+```javascript
+for (let day = 1; day < dayStates.length; day++) {
+    const comps = calculateDayComponents(dayStates[day], year, month, day);
+    totalRecargosExtras += comps.recargo + comps.extra;
+    
+    if (dayStates[day] === 'A') {
+        countAusencias++;
+    } else {
+        countWorkedDays++;
+        if (!useCommercial) {
+            totalBasic += comps.basic;
+        }
+    }
+}
+```
+
+**3. Calculate Base Components (Mode-Dependent)**
+
+**Commercial Mode:**
+```javascript
+const daysToPay = 30 - countAusencias;
+finalBasic = Math.round((rawSalary / 30) * daysToPay);
+finalTransport = Math.round((rawTransport / 30) * daysToPay);
+```
+
+**Real Days Mode:**
+```javascript
+finalBasic = Math.round(totalBasic);
+finalTransport = Math.round((rawTransport / 30) * countWorkedDays);
+```
+
+**4. Calculate Totals**
+```javascript
+const grandTotal = finalBasic + totalRecargosExtras;
+const ibc = grandTotal;
+```
+
+**5. Calculate Deductions**
+```javascript
+const salud = Math.round(ibc * 0.04);
+const pension = Math.round(ibc * 0.04);
+const totalDeducciones = salud + pension;
+```
+
+**6. Calculate Net Pay**
+```javascript
+const neto = (grandTotal + finalTransport) - totalDeducciones;
+```
+
+**7. Update UI**
+```javascript
+document.getElementById('valTotalTurnos').innerText = formatMoney(grandTotal);
+document.getElementById('valTransporte').innerText = formatMoney(finalTransport);
+document.getElementById('totalDevengado').innerText = formatMoney(grandTotal + finalTransport);
+document.getElementById('dedSalud').innerText = formatMoney(salud);
+document.getElementById('dedPension').innerText = formatMoney(pension);
+document.getElementById('totalDeducciones').innerText = formatMoney(totalDeducciones);
+document.getElementById('netPay').innerText = formatMoney(neto);
+```
+
+---
+
+## Shift Pattern Calculation
+
+**Code:** Lines 399-404, 440-450
+
+```javascript
+const patterns = {
+    '2D2N2X': ['D', 'D', 'N', 'N', 'X', 'X'],
+    '4D2X': ['D', 'D', 'D', 'D', 'X', 'X'],
+    '4N2X': ['N', 'N', 'N', 'N', 'X', 'X'],
+    'MANUAL': ['X']
+};
+
+for (let day = 1; day <= daysInMonth; day++) {
+    const currentObj = new Date(year, month - 1, day);
+    const diffTime = currentObj - cycleStartDate;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    let patternIndex = diffDays % pattern.length;
+    if (patternIndex < 0) patternIndex = pattern.length + patternIndex;
+    dayStates[day] = pattern[patternIndex];
+}
+```
+
+**Formula:**
+```
+Days Difference = (Current Date - Cycle Start Date) in days
+Pattern Index = Days Difference mod Pattern Length
+Shift Type = Pattern[Pattern Index]
+```
+
+**Example:**
+- Pattern: 2D2N2X (length 6)
+- Cycle Start: March 1, 2026
+- Current Day: March 10, 2026
+
+```
+Days Difference = 10 - 1 = 9
+Pattern Index = 9 mod 6 = 3
+Pattern = ['D', 'D', 'N', 'N', 'X', 'X']
+Shift Type = Pattern[3] = 'N' (Nocturno)
+```
+
+---
+
+## Rounding Rules
+
+All monetary calculations use `Math.round()` for rounding:
+
+```javascript
+const hourValue = Math.round(salary / divisor);
+finalBasic = Math.round((rawSalary / 30) * daysToPay);
+const salud = Math.round(ibc * 0.04);
+```
+
+**Rounding:**
+- Standard banker's rounding (0.5 rounds up)
+- Applied at each calculation step
+- Final values displayed without decimal places
+
+---
+
+## Summary Formulas
+
+### Daily Calculations
+
+| Shift Type | Total Formula |
+|------------|---------------|
+| D (Day) | `13 × HR` |
+| N (Night) | `17.45 × HR` |
+| X (Rest) | `8 × HR` |
+| E (Holiday) | `13 × HR + 12 × HR × FS` |
+| P (Leave) | `8 × HR` |
+| A (Absence) | `0` |
+
+Where:
+- HR = Hourly Rate = Base Salary ÷ Divisor
+- FS = Festival Surcharge (0.80 or 0.90)
+
+### Monthly Calculations
+
+**Commercial Month Mode:**
+```
+Basic = (Base Salary ÷ 30) × (30 - Absences)
+Transport = (Transport Allowance ÷ 30) × (30 - Absences)
+IBC = Basic + Σ(Surcharges + Extras)
+Net = (IBC + Transport) - (IBC × 0.08)
+```
+
+**Real Days Mode:**
+```
+Basic = Σ(Daily Basic Pay)
+Transport = (Transport Allowance ÷ 30) × Worked Days
+IBC = Basic + Σ(Surcharges + Extras)
+Net = (IBC + Transport) - (IBC × 0.08)
+```
+
+---
+
+## Related References
+
+- [Shift Types](/reference/shift-types) - Shift type definitions
+- [Surcharge Rates](/reference/surcharge-rates) - Detailed rate explanations
+- [Deductions](/reference/deductions) - IBC and deduction details

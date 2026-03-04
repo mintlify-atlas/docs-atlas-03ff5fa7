@@ -1,80 +1,268 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quickstart Guide"
+description: "Calculate your first security guard payroll in minutes with this step-by-step walkthrough"
 ---
 
-## Get started in three steps
+This guide walks you through calculating a complete payroll for a security guard using the Calculadora Vigilancia. You'll learn how to enter salary information, configure shift patterns, and generate a professional PDF report.
 
-Get your documentation site running locally and make your first customization.
+## Opening the Calculator
 
-### Step 1: Set up your local environment
+The Calculadora Vigilancia is a single-page HTML application. To get started:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+<Steps>
+  <Step title="Open the calculator file">
+    Simply open `index.html` in any modern web browser (Chrome, Firefox, Edge, or Safari). No installation or server setup required.
+  </Step>
+  
+  <Step title="Verify the interface loaded">
+    You should see a clean interface with the title "Calculadora Vigilantes" and a control panel at the top containing input fields for salary and shift configuration.
+  </Step>
+</Steps>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+The calculator runs entirely in your browser. No data is sent to any server, ensuring complete privacy for payroll calculations.
 </Note>
+
+## Entering Base Salary Information
+
+The calculator requires two primary salary inputs:
+
+<Steps>
+  <Step title="Enter the base salary">
+    In the "Salario Básico ($)" field, enter the employee's monthly base salary. For example: `1.750.905`
+    
+    The field automatically formats numbers with Colombian thousand separators as you type.
+
+    ```javascript
+    // Currency formatting happens automatically
+    function formatCurrency(input) {
+        let value = input.value.replace(/\D/g, '');
+        if(value !== '') {
+            input.value = new Intl.NumberFormat('es-CO').format(value);
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Enter the transport allowance">
+    In the "Auxilio Transporte ($)" field, enter the monthly transport subsidy. For 2026, this is typically: `249.095`
+    
+    This allowance is paid proportionally based on worked days and is not included in the deduction base.
+  </Step>
+</Steps>
+
+<Info>
+The calculator automatically adjusts hourly rates based on the legal divisor (220 hours before July 15, 2026, and 210 hours after) according to Colombian labor law changes.
+</Info>
+
+## Selecting the Payroll Period
+
+Configure the month and year for the payroll calculation:
+
+<Steps>
+  <Step title="Choose the month">
+    Use the "Periodo de Pago" dropdown to select the desired month (Enero, Febrero, Marzo, etc.).
+  </Step>
+  
+  <Step title="Choose the year">
+    Select the year from the adjacent dropdown. Available options range from 2024 to 2027.
+    
+    The year selection is critical because it determines:
+    - The hourly rate divisor (220h vs 210h)
+    - Festive day surcharge rates (0.80 vs 0.90)
+  </Step>
+</Steps>
+
+```html
+<!-- Period selection dropdowns -->
+<select id="selMonth" onchange="resetAndGenerate()">
+    <option value="1">Enero</option>
+    <option value="2">Febrero</option>
+    <!-- ... -->
+</select>
+<select id="selYear" onchange="resetAndGenerate()">
+    <option value="2024">2024</option>
+    <option value="2025">2025</option>
+    <option value="2026" selected>2026</option>
+    <option value="2027">2027</option>
+</select>
+```
+
+## Choosing a Shift Pattern
+
+Security guards typically work in rotating shift patterns. Select the pattern that matches your employee's schedule:
+
+<Steps>
+  <Step title="Select from preset patterns">
+    Use the "Patrón Inicial" dropdown to choose:
+    
+    - **2x2x2 (Rotativo)**: 2 day shifts, 2 night shifts, 2 rest days - repeating cycle
+    - **4x2 Diurno**: 4 consecutive day shifts, 2 rest days
+    - **4x2 Nocturno**: 4 consecutive night shifts, 2 rest days
+    - **Manual**: Manually configure each day individually
+  </Step>
+  
+  <Step title="Set the cycle start date">
+    In the "Inicio Ciclo" field, select the date when the shift pattern begins. This ensures the pattern aligns correctly with the actual work schedule.
+    
+    For example, if the employee started their rotation on March 1, 2026, select that date.
+  </Step>
+</Steps>
+
+<Warning>
+The cycle start date must be accurate for the shift pattern to calculate correctly. An incorrect date will misalign day/night shifts throughout the month.
+</Warning>
+
+The pattern logic works by calculating days from the start date:
+
+```javascript
+const patterns = {
+    '2D2N2X': ['D', 'D', 'N', 'N', 'X', 'X'],  // Day, Day, Night, Night, Rest, Rest
+    '4D2X': ['D', 'D', 'D', 'D', 'X', 'X'],     // 4 Day shifts, 2 Rest
+    '4N2X': ['N', 'N', 'N', 'N', 'X', 'X'],     // 4 Night shifts, 2 Rest
+    'MANUAL': ['X']                              // All rest days (manual override)
+};
+
+// Pattern assignment per day
+const currentObj = new Date(year, month - 1, day);
+const diffTime = currentObj - cycleStartDate;
+const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+let patternIndex = diffDays % pattern.length;
+```
+
+## Generating the Calendar
+
+Once you've configured the basic parameters, generate the interactive calendar:
+
+<Steps>
+  <Step title="Click 'Generar Calendario'">
+    Press the blue "Generar Calendario" button in the control panel. This populates the calendar grid below with all days of the selected month.
+  </Step>
+  
+  <Step title="Review the generated shifts">
+    Each day cell displays:
+    - The day number with hourly divisor indicator (220h or 210h)
+    - The shift type (Diurno, Nocturno, Descanso, etc.)
+    - The calculated payment for that specific day
+    
+    Days are color-coded:
+    - Yellow: Day shifts
+    - Blue: Night shifts
+    - Green: Rest days
+    - Purple: Paid leave
+    - Red: Unpaid absences
+    - Orange: Extra/festive work
+  </Step>
+  
+  <Step title="Adjust individual days (optional)">
+    Click any day cell to open a detailed modal where you can:
+    - Change the shift type for that specific day
+    - View the breakdown of basic pay, surcharges, and overtime
+    - Navigate between days using arrow buttons
+  </Step>
+</Steps>
+
+<Info>
+The calendar automatically recalculates all totals when you modify any day. You can freely adjust shifts to account for schedule changes, sick days, or overtime.
+</Info>
+
+## Viewing the Payroll Summary
+
+Below the calendar, the financial summary displays the complete payroll breakdown:
+
+<Steps>
+  <Step title="Review earned income (Devengado)">
+    The left column shows:
+    - **Valor Turnos + Recargos**: Total from all shifts including surcharges and overtime
+    - **Aux. Transporte**: Prorated transport allowance
+    - **TOTAL DEVENGADO**: Sum of all earnings
+  </Step>
+  
+  <Step title="Check deductions">
+    The right column displays mandatory deductions:
+    - **Salud (4%)**: Health insurance contribution
+    - **Pensión (4%)**: Pension fund contribution
+    - **TOTAL DEDUCCIONES**: Total deducted from gross pay
+    
+    Note: Deductions are calculated on total shifts earned, excluding transport allowance.
+  </Step>
+  
+  <Step title="Confirm net payment">
+    The bottom section shows the final "NETO A PAGAR" - the amount the employee receives after all deductions.
+  </Step>
+</Steps>
+
+The deduction calculation logic:
+
+```javascript
+const grandTotal = finalBasic + totalRecargosExtras;
+const ibc = grandTotal; // Base for deductions (excludes Transport)
+const salud = Math.round(ibc * 0.04);
+const pension = Math.round(ibc * 0.04);
+const totalDeducciones = salud + pension;
+const neto = (grandTotal + finalTransport) - totalDeducciones;
+```
+
+<Note>
+By default, the calculator uses "commercial month" mode (30 days), which calculates payments as: `(Salary / 30) * (30 - Absences)`. You can disable this checkbox to use actual calendar days instead.
+</Note>
+
+## Exporting to PDF
+
+Generate a professional payroll report for record-keeping and employee distribution:
+
+<Steps>
+  <Step title="Click 'Descargar PDF'">
+    Press the red "Descargar PDF" button in the control panel.
+  </Step>
+  
+  <Step title="Review the PDF content">
+    The generated PDF includes:
+    - Header with period and base salary information
+    - Summary table showing total earned income and deductions
+    - Net payment prominently displayed
+    - Detailed attendance table with daily breakdown (shift type, divisor, basic pay, surcharges, extras, and daily totals)
+  </Step>
+  
+  <Step title="Save or print">
+    The file automatically downloads as `Nomina_[Month]_[Year].pdf`. You can print it directly or save it to your records system.
+  </Step>
+</Steps>
+
+The PDF generation uses the jsPDF library with auto-table plugin:
+
+```javascript
+function generatePDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(18);
+    doc.text("Volante de Nómina", 105, 15, null, null, "center");
+    
+    // Summary table with earnings and deductions
+    doc.autoTable({
+        head: [['Concepto', 'Devengados', 'Deducciones']],
+        body: [
+            ['Valor Turnos Trabajados', totalTurnos, ''],
+            ['Auxilio de Transporte', auxTrans, ''],
+            // ...
+        ]
+    });
+    
+    // Detailed daily attendance table
+    doc.autoTable({
+        head: [['Dia', 'Novedad', 'Div', 'Basico', 'Recargos', 'Extras', 'Total']],
+        body: rows,
+        theme: 'striped'
+    });
+}
+```
+
+## Next Steps
+
+Now that you've completed your first payroll calculation:
+
+- Learn about [shift types and overtime rates](/reference/shift-types) to understand how different work patterns affect pay
+- Explore [legal compliance features](/features/colombian-labor-law) to ensure your calculations meet Colombian labor law requirements
+- Review [surcharge rates](/reference/surcharge-rates) for handling holidays and overtime calculations

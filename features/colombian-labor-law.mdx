@@ -1,0 +1,339 @@
+---
+title: 'Colombian Labor Law Compliance'
+description: 'Automatic application of Ley 2101 and divisor changes for labor hour reductions'
+icon: 'gavel'
+---
+
+## Overview
+
+Calculadora Vigilancia automatically implements Colombian labor law regulations, specifically **Ley 2101 de 2021** (progressive reduction of the work week) and the Código Sustantivo del Trabajo provisions for overtime and surcharges.
+
+## Ley 2101 de 2021 - Work Week Reduction
+
+Ley 2101 establishes a gradual reduction of the maximum weekly work hours from 48 to 42 hours over several years.
+
+<Steps>
+  <Step title="July 15, 2023">
+    48 hours/week → **47 hours/week**
+  </Step>
+  <Step title="July 15, 2024">
+    47 hours/week → **46 hours/week**
+  </Step>
+  <Step title="July 15, 2025">
+    46 hours/week → **45 hours/week** (projected)
+  </Step>
+  <Step title="July 15, 2026">
+    45 hours/week → **42 hours/week** (final)
+  </Step>
+</Steps>
+
+## Divisor Calculation
+
+The **divisor** determines how many hours per month are considered in the base salary. It directly affects the value of each hour worked.
+
+**Formula**: `Monthly Divisor = (Weekly Hours × 52 weeks) / 12 months`
+
+### Historical Divisors
+
+| Period | Weekly Hours | Monthly Divisor | Status |
+|--------|--------------|-----------------|--------|
+| Before July 2023 | 48h | 240h | Legacy |
+| July 2023 - July 2024 | 47h | 235h | Transitional |
+| July 2024 - July 2025 | 46h | ≈230h | Transitional |
+| July 2025 onwards | 42h | 210h | Future |
+
+<Note>
+  The source code currently implements a simplified version with two divisors: **220** (before July 15, 2026) and **210** (after). This may be updated as regulations evolve.
+</Note>
+
+## Implementation in Code
+
+### getDivisorForDate Function
+
+```javascript index.html (lines 387-391)
+function getDivisorForDate(year, month, day) {
+    const current = new Date(year, month - 1, day).getTime();
+    const transition = new Date(2026, 6, 15).getTime(); 
+    return (current >= transition) ? 210 : 220;
+}
+```
+
+**Logic**:
+1. Convert the date being calculated to milliseconds
+2. Compare against the transition date (July 15, 2026)
+3. Return appropriate divisor:
+   - **220** for dates before July 15, 2026
+   - **210** for dates on/after July 15, 2026
+
+<Accordion title="Why per-day divisor checking?">
+  In mixed-month scenarios (e.g., July 2026 with days before and after the 15th), each day must use the correct divisor. This ensures:
+  
+  - **Legal compliance**: Days before transition use old rate
+  - **Fair compensation**: Days after transition use higher hourly rate
+  - **Accurate totals**: Monthly pay reflects both rates proportionally
+
+  Example for July 2026:
+  - Days 1-14: Divisor 220 → $7,959/hour
+  - Days 15-31: Divisor 210 → $8,338/hour
+</Accordion>
+
+### Divisor Impact on Hour Value
+
+Using default salary **$1,750,905**:
+
+<CardGroup cols={2}>
+  <Card title="Divisor 220" icon="calendar-minus">
+    **Before July 15, 2026**
+    
+    $1,750,905 / 220 = **$7,959/hour**
+    
+    Lower hourly value
+  </Card>
+  <Card title="Divisor 210" icon="calendar-plus">
+    **After July 15, 2026**
+    
+    $1,750,905 / 210 = **$8,338/hour**
+    
+    **+4.76% increase**
+  </Card>
+</CardGroup>
+
+**Impact on Daily Pay** (using day shift example):
+
+| Component | Divisor 220 | Divisor 210 | Difference |
+|-----------|-------------|-------------|------------|
+| Basic (8h) | $63,672 | $66,704 | +$3,032 |
+| Extra (4h × 1.25) | $39,795 | $41,690 | +$1,895 |
+| **Total** | **$103,467** | **$108,394** | **+$4,927** (+4.76%) |
+
+<Warning>
+  The divisor reduction means **higher hourly rates** with the **same base salary**, benefiting workers as the work week decreases per Ley 2101.
+</Warning>
+
+## Festive Surcharge Evolution
+
+### getFestiveSurcharge Function
+
+```javascript index.html (lines 393-397)
+function getFestiveSurcharge(year, month, day) {
+    const current = new Date(year, month - 1, day).getTime();
+    const transition2026 = new Date(2026, 6, 1).getTime(); 
+    return (current >= transition2026) ? 0.90 : 0.80;
+}
+```
+
+**Transition**: July 1, 2026
+- **Before**: 0.80 (80% surcharge)
+- **After**: 0.90 (90% surcharge)
+
+<Accordion title="Why festive surcharge increases">
+  This may reflect regulatory changes or collective bargaining agreements that increase compensation for Sunday/holiday work. The 10-point increase (0.80 → 0.90) represents a **12.5% bump** in festive pay.
+
+  **Example**: Extra/Festivo day shift
+  - Before July 1: Festive extra = 1.25 + 0.80 = **2.05x**
+  - After July 1: Festive extra = 1.25 + 0.90 = **2.15x**
+</Accordion>
+
+### Combined Effect (July 2026)
+
+For an Extra/Festivo day starting July 15, 2026:
+
+**Salary**: $1,750,905
+
+**Hour Value**: $1,750,905 / 210 = $8,338
+
+**Calculations**:
+- Basic: 8h × $8,338 = $66,704
+- Recargo Festivo: 8h × $8,338 × 0.90 = $60,034
+- Extra Festiva: 4h × $8,338 × (1.25 + 0.90) = $71,706
+- **Total**: **$198,444**
+
+Compared to before July 1, 2026 (220 divisor, 0.80 surcharge): **$179,912**
+
+**Increase**: +$18,532 (+10.3%) per festive day
+
+## Legal Multipliers Reference
+
+Based on **Código Sustantivo del Trabajo**:
+
+<AccordionGroup>
+  <Accordion title="Art. 168 - Recargo Nocturno">
+    **Night Surcharge**: 35% (0.35x)
+
+    Applies to work between **9:00 PM and 6:00 AM**
+
+    ```javascript
+    details.recargo = (7 * hourValue * 0.35); // Night shift
+    ```
+  </Accordion>
+
+  <Accordion title="Art. 159 - Horas Extras Diurnas">
+    **Daytime Overtime**: 25% (1.25x total)
+
+    Applies to hours **beyond 8 ordinary hours** during daytime (6am-9pm)
+
+    ```javascript
+    details.extra = 4 * hourValue * 1.25; // Day shift overtime
+    ```
+  </Accordion>
+
+  <Accordion title="Art. 168 - Horas Extras Nocturnas">
+    **Nighttime Overtime**: 75% (1.75x total)
+
+    Combines extra (25%) + night (35%) + additional night overtime (15%)
+
+    ```javascript
+    details.extra = (4 * hourValue * 1.75); // Night shift overtime
+    ```
+  </Accordion>
+
+  <Accordion title="Art. 179 - Trabajo Dominical y Festivo">
+    **Sunday/Holiday Work**: 75% surcharge (1.75x)
+
+    The code uses variable rates (0.80 → 0.90) which may reflect:
+    - Collective agreements
+    - Security industry standards
+    - Additional municipal/departmental regulations
+
+    Standard legal minimum would be 0.75, but many contracts pay higher.
+  </Accordion>
+</AccordionGroup>
+
+## Commercial Month (30 days) Standard
+
+The default "Ajustar a Mes Comercial" option aligns with Colombian payroll practice:
+
+```javascript
+if (useCommercial) {
+    const daysToPay = 30 - countAusencias;
+    finalBasic = Math.round((rawSalary / 30) * daysToPay);
+    finalTransport = Math.round((rawTransport / 30) * daysToPay);
+}
+```
+
+**Legal Basis**: While not explicitly mandated, the 30-day commercial month is industry standard for:
+- Simplifying payroll across different-length months
+- Consistent budgeting
+- Standardized contracts
+
+**Formula**: `Daily Rate = Monthly Salary / 30`
+
+<Note>
+  This means February (28 days) and January (31 days) both use the same base monthly salary, with adjustments only for absences.
+</Note>
+
+## Deductions: Health & Pension
+
+```javascript
+const ibc = grandTotal; // Ingreso Base de Cotización
+const salud = Math.round(ibc * 0.04);
+const pension = Math.round(ibc * 0.04);
+```
+
+**Legal Rates** (Employee contributions):
+- **Salud (Health)**: 4% of IBC
+- **Pensión (Pension)**: 4% of IBC
+
+**IBC Definition**: Includes salary + recargos + extras, excludes transportation allowance
+
+<Warning>
+  Employers must also contribute:
+  - **Health**: 8.5% (total 12.5%)
+  - **Pension**: 12% (total 16%)
+  - **Parafiscales**: Varies by company size
+  - **ARL**: Risk-based rate (0.522% - 6.96%)
+
+  This calculator shows only **employee deductions**.
+</Warning>
+
+## Divisor Display in UI
+
+```javascript index.html (lines 706-725)
+function updateEducationalTable() {
+    const divisorRef = getDivisorForDate(year, month, 1);
+    const hourVal = Math.round(salary / divisorRef); 
+    
+    // Explanation Logic
+    let explanation = "";
+    if (divisorRef === 220) explanation = "Divisor 220 (Jornada 47h - Ley 2101)";
+    else if (divisorRef === 210) explanation = "Divisor 210 (Jornada 46h - Reducción Julio 2024/25)";
+    else explanation = `Divisor Estándar ${divisorRef}`;
+
+    document.getElementById('lblValorHora').innerText = formatMoney(hourVal) + ` (Base ${divisorRef}h/mes)`;
+    document.getElementById('lblDivisorExplanation').innerText = explanation;
+}
+```
+
+The interface shows:
+- Current divisor applied
+- Resulting hour value
+- Legal context explanation
+
+## Per-Day Divisor Indicator
+
+Each calendar cell displays the divisor used for that specific day:
+
+```javascript index.html (lines 486-489)
+cell.innerHTML = `
+    <div class="day-number">${day} <span class="rate-indicator">${divisor}h</span></div>
+    <div class="day-label">${config.label}</div>
+    <div class="day-money">$ ${Math.round(cellVals.total).toLocaleString()}</div>
+`;
+```
+
+This allows visual verification that the law changes are applied correctly on transition dates.
+
+## Compliance Checklist
+
+<Steps>
+  <Step title="Ley 2101 Implementation">
+    ✅ Divisor automatically adjusts based on date  
+    ✅ Smooth transition in mixed months  
+    ✅ Higher hourly rates post-transition
+  </Step>
+  
+  <Step title="Overtime Multipliers">
+    ✅ 1.25x for daytime extras  
+    ✅ 1.75x for nighttime extras  
+    ✅ Progressive festive surcharges
+  </Step>
+  
+  <Step title="Night Surcharges">
+    ✅ 0.35x on night hours (9pm-6am)  
+    ✅ Applied correctly in 12-hour shifts
+  </Step>
+  
+  <Step title="Deductions">
+    ✅ 4% health on IBC  
+    ✅ 4% pension on IBC  
+    ✅ Transportation excluded from IBC
+  </Step>
+  
+  <Step title="Commercial Month">
+    ✅ 30-day standardization  
+    ✅ Absence deductions  
+    ✅ Proportional transport
+  </Step>
+</Steps>
+
+## Important Dates
+
+| Date | Change | Impact |
+|------|--------|--------|
+| July 1, 2026 | Festive surcharge: 0.80 → 0.90 | +12.5% on holiday pay |
+| July 15, 2026 | Divisor: 220 → 210 | +4.76% hourly rate |
+
+<Check>
+  All changes are **automatic** based on the selected month and year. No manual configuration needed.
+</Check>
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Payroll Calculation" icon="calculator" href="/features/payroll-calculation">
+    See how divisors affect pay
+  </Card>
+  <Card title="Shift Patterns" icon="calendar-days" href="/features/shift-patterns">
+    Configure work schedules
+  </Card>
+</CardGroup>

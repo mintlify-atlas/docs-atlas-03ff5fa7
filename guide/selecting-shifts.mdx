@@ -1,0 +1,205 @@
+---
+title: Selecting Shifts
+description: How to select shift patterns, set cycle start dates, and use manual mode for custom schedules
+---
+
+Shift pattern selection allows you to automatically generate work schedules based on common security guard rotation patterns. You can also manually configure each day for complete control.
+
+## Available Shift Patterns
+
+The calculator supports four shift patterns defined in the `patterns` object (index.html:399-404):
+
+```javascript
+const patterns = {
+    '2D2N2X': ['D', 'D', 'N', 'N', 'X', 'X'],
+    '4D2X': ['D', 'D', 'D', 'D', 'X', 'X'],
+    '4N2X': ['N', 'N', 'N', 'N', 'X', 'X'],
+    'MANUAL': ['X']
+};
+```
+
+### Pattern Descriptions
+
+| Pattern | Name | Schedule | Shift Types |
+|---------|------|----------|-------------|
+| **2x2x2 (Rotativo)** | `2D2N2X` | 2 days, 2 nights, 2 rest | Mixed day/night rotation |
+| **4x2 Diurno** | `4D2X` | 4 days, 2 rest | Day shifts only |
+| **4x2 Nocturno** | `4N2X` | 4 nights, 2 rest | Night shifts only |
+| **Manual** | `MANUAL` | Custom configuration | User-defined |
+
+### Shift State Types
+
+Each day can have one of six states (index.html:407-414):
+
+```javascript
+const stateConfig = {
+    'D': { label: 'Diurno', class: 'cell-diurno' },      // Day shift
+    'N': { label: 'Nocturno', class: 'cell-nocturno' },  // Night shift
+    'X': { label: 'Descanso', class: 'cell-descanso' },  // Rest day
+    'E': { label: 'Extra/Fest', class: 'cell-extra' },   // Extra/Holiday
+    'P': { label: 'Permiso', class: 'cell-permiso' },    // Paid leave
+    'A': { label: 'Ausencia', class: 'cell-ausencia' }   // Absence
+};
+```
+
+## Setting Up Shift Patterns
+
+<Steps>
+  <Step title="Select Period">
+    Choose the month and year for your payroll period using the "Periodo de Pago" dropdowns.
+    
+    The calculator initializes to the current date:
+    ```javascript
+    const today = new Date();
+    document.getElementById('selMonth').value = today.getMonth() + 1;
+    document.getElementById('selYear').value = today.getFullYear();
+    ```
+  </Step>
+  
+  <Step title="Choose Shift Pattern">
+    Select your desired pattern from the "Patrón Inicial" dropdown:
+    - **2x2x2 (Rotativo)**: For rotating day/night schedules
+    - **4x2 Diurno**: For dedicated day shift workers
+    - **4x2 Nocturno**: For dedicated night shift workers
+    - **Manual**: For custom configurations
+  </Step>
+  
+  <Step title="Set Cycle Start Date">
+    Choose when the shift pattern begins using the "Inicio Ciclo" date picker. This determines how the pattern aligns with the calendar.
+    
+    The default is set to the first day of the current month:
+    ```javascript
+    document.getElementById('cycleStartDate').value = 
+        `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+    ```
+  </Step>
+  
+  <Step title="Generate Calendar">
+    Click "Generar Calendario" to apply the pattern to all days of the month.
+  </Step>
+</Steps>
+
+## How Pattern Generation Works
+
+The `resetAndGenerate()` function (index.html:426-454) calculates which shift type applies to each day:
+
+```javascript
+for (let day = 1; day <= daysInMonth; day++) {
+    if(patternKey === 'MANUAL') {
+        dayStates[day] = 'X'; 
+        continue;
+    }
+    const currentObj = new Date(year, month - 1, day);
+    const diffTime = currentObj - cycleStartDate;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    let patternIndex = diffDays % pattern.length;
+    if (patternIndex < 0) patternIndex = pattern.length + patternIndex;
+    dayStates[day] = pattern[patternIndex];
+}
+```
+
+### Pattern Calculation Example
+
+**Scenario:** 2x2x2 pattern starting January 1, 2026
+
+- **Day 1 (Jan 1)**: 0 days from start → Index 0 → 'D' (Diurno)
+- **Day 2 (Jan 2)**: 1 day from start → Index 1 → 'D' (Diurno)
+- **Day 3 (Jan 3)**: 2 days from start → Index 2 → 'N' (Nocturno)
+- **Day 4 (Jan 4)**: 3 days from start → Index 3 → 'N' (Nocturno)
+- **Day 5 (Jan 5)**: 4 days from start → Index 4 → 'X' (Descanso)
+- **Day 6 (Jan 6)**: 5 days from start → Index 5 → 'X' (Descanso)
+- **Day 7 (Jan 7)**: 6 days from start → Index 0 (6 % 6) → 'D' (Diurno)
+
+The pattern repeats every 6 days for the 2x2x2 schedule.
+
+<Info>
+  The cycle start date is crucial for maintaining continuity across months. If a worker's pattern started mid-month previously, use that date as the cycle start to maintain proper rotation.
+</Info>
+
+## Using Manual Mode
+
+Manual mode gives you complete control over each day's shift type.
+
+<Steps>
+  <Step title="Enable Manual Mode">
+    Select "Manual" from the "Patrón Inicial" dropdown and generate the calendar. All days will initialize as rest days ('X').
+  </Step>
+  
+  <Step title="Configure Individual Days">
+    Click on any day in the calendar to open the day detail modal.
+  </Step>
+  
+  <Step title="Select Shift Type">
+    In the modal, use the "Seleccionar Turno" dropdown to choose:
+    - ☀️ Diurno (12h) - Day shift
+    - 🌑 Nocturno (12h) - Night shift
+    - 🟢 Descanso - Rest day
+    - 🟠 Extra/Festivo - Extra/Holiday work
+    - 🟣 Permiso Remunerado - Paid leave
+    - 🔴 Ausencia No Justificada - Unjustified absence
+  </Step>
+  
+  <Step title="View Automatic Calculations">
+    The modal immediately shows the calculations for that day, including basic pay, surcharges, and extras.
+  </Step>
+</Steps>
+
+### Modal Navigation
+
+The day detail modal includes navigation buttons (index.html:324-328) to move between days:
+
+```javascript
+function changeModalDay(offset) {
+    const year = parseInt(document.getElementById('selYear').value);
+    const month = parseInt(document.getElementById('selMonth').value);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    
+    const newDay = currentSelectedDay + offset;
+
+    // Validate limits
+    if (newDay >= 1 && newDay <= daysInMonth) {
+        openModal(newDay);
+    }
+}
+```
+
+- **❮ (Previous)**: Go to the previous day
+- **❯ (Next)**: Go to the next day
+- Navigate without closing the modal for faster editing
+
+<Tip>
+  Use keyboard shortcuts for efficiency:
+  - Press **Escape** to close the modal
+  - Use **Tab** to navigate between fields
+  - Arrow buttons maintain your workflow when editing multiple consecutive days
+</Tip>
+
+## Modifying Generated Patterns
+
+Even when using automatic patterns, you can override individual days:
+
+1. Generate the calendar with your chosen pattern
+2. Click any day that needs adjustment
+3. Change the shift type in the modal
+4. The change persists until you regenerate the calendar
+
+<Info>
+  Changes made to individual days are lost when you click "Generar Calendario" again. Make pattern adjustments before finalizing your payroll period.
+</Info>
+
+## Best Practices
+
+<Tip>
+  For workers on rotating shifts, align the cycle start date with when their rotation actually began, not necessarily the first of the month. This ensures accurate pattern repetition.
+</Tip>
+
+<Tip>
+  Use the 2x2x2 rotativo pattern for full-coverage positions that require both day and night shifts throughout the month.
+</Tip>
+
+<Info>
+  When selecting patterns, remember:
+  - 4x2 patterns repeat every 6 days
+  - 2x2x2 patterns repeat every 6 days
+  - All patterns automatically wrap around month boundaries
+</Info>

@@ -1,0 +1,255 @@
+---
+title: Understanding Rates
+description: Learn about hourly rates, surcharges, and how the educational rates table displays all calculation multipliers
+---
+
+The calculator uses a comprehensive system of hourly rates and surcharges based on Colombian labor law. Understanding these rates is essential for accurate payroll calculations.
+
+## Base Hourly Rate
+
+The hourly rate is the foundation for all shift and surcharge calculations:
+
+**Formula:**
+```
+Hourly Rate = Base Salary ÷ Divisor
+```
+
+**Example:**
+- Base Salary: $1,750,905
+- Divisor (220 hours): 220
+- **Hourly Rate: $7,959**
+
+```javascript
+const salary = getRawMoney('baseSalary');
+const divisor = getDivisorForDate(year, month, day);
+const hourValue = Math.round(salary / divisor);
+```
+
+The divisor changes based on labor law transitions (220 hours before July 15, 2026, then 210 hours).
+
+## Rate Multipliers
+
+All surcharges and extras are calculated by multiplying the base hourly rate by specific multipliers defined by Colombian labor law:
+
+### Standard Rates
+
+| Rate Type | Multiplier | Calculation | Description |
+|-----------|------------|-------------|-------------|
+| **Hora Ordinaria** | 1.0× | Rate × 1.0 | Regular working hour |
+| **Recargo Nocturno** | 0.35× | Rate × 0.35 | Night surcharge (10pm-6am) |
+| **Extra Diurna** | 1.25× | Rate × 1.25 | Daytime overtime |
+| **Extra Nocturna** | 1.75× | Rate × 1.75 | Nighttime overtime |
+
+### Holiday/Sunday Rates
+
+Holiday and Sunday surcharges have variable multipliers that depend on the date:
+
+```javascript
+function getFestiveSurcharge(year, month, day) {
+    const current = new Date(year, month - 1, day).getTime();
+    const transition2026 = new Date(2026, 6, 1).getTime(); 
+    return (current >= transition2026) ? 0.90 : 0.80;
+}
+```
+
+| Rate Type | Before July 2026 | After July 2026 | Description |
+|-----------|------------------|-----------------|-------------|
+| **Extra/Dominical** | 1.8× / 1.9× | 1.9× / 2.0× | Holiday/Sunday work |
+| **Extra Dom. Diurna** | 2.05× / 2.15× | 2.15× / 2.25× | Holiday/Sunday day extra |
+| **Extra Dom. Nocturna** | 2.55× / 2.65× | 2.65× / 2.75× | Holiday/Sunday night extra |
+
+<Info>
+  The dual values (e.g., 1.8× / 1.9×) represent the calculation: 1.0 (base) + 0.80 (festive surcharge) = 1.8× for base hours, and 1.0 + 0.25 (extra) + 0.80 (festive) = 2.05× for extra hours.
+</Info>
+
+## Educational Rates Table
+
+The `updateEducationalTable()` function (index.html:706-735) displays all current rates in the UI:
+
+```javascript
+function updateEducationalTable() {
+    const salary = getRawMoney('baseSalary');
+    const year = parseInt(document.getElementById('selYear').value);
+    const month = parseInt(document.getElementById('selMonth').value);
+    const divisorRef = getDivisorForDate(year, month, 1);
+    const hourVal = Math.round(salary / divisorRef); 
+    const festPct = getFestiveSurcharge(year, month, 1);
+
+    // Explanation Logic
+    let explanation = "";
+    if (divisorRef === 220) 
+        explanation = "Divisor 220 (Jornada 47h - Ley 2101)";
+    else if (divisorRef === 210) 
+        explanation = "Divisor 210 (Jornada 46h - Reducción Julio 2024/25)";
+    else 
+        explanation = `Divisor Estándar ${divisorRef}`;
+
+    document.getElementById('lblValorHora').innerText = 
+        formatMoney(hourVal) + ` (Base ${divisorRef}h/mes)`;
+    document.getElementById('lblDivisorExplanation').innerText = explanation;
+
+    document.getElementById('rate-ord').innerText = formatMoney(hourVal);
+    document.getElementById('rate-rec-noc').innerText = formatMoney(hourVal * 0.35);
+    document.getElementById('rate-ext-diu').innerText = formatMoney(hourVal * 1.25);
+    document.getElementById('rate-ext-noc').innerText = formatMoney(hourVal * 1.75);
+    
+    document.getElementById('rate-rec-dom').innerText = 
+        formatMoney(hourVal * (1 + festPct));
+    document.getElementById('rate-ext-dom-diu').innerText = 
+        formatMoney(hourVal * (1.25 + festPct));
+    document.getElementById('rate-ext-dom-noc').innerText = 
+        formatMoney(hourVal * (1.75 + festPct));
+}
+```
+
+This function:
+1. Retrieves the current base salary
+2. Determines the appropriate divisor for the selected period
+3. Calculates the hourly rate
+4. Gets the festive surcharge percentage
+5. Updates all rate display fields with calculated values
+6. Shows an explanation of which divisor is being used
+
+## Rate Calculation Examples
+
+### Example 1: Day Shift (Diurno)
+
+**Given:**
+- Hourly Rate: $7,959
+- Shift: Day (12 hours)
+- Hours breakdown: 8 regular + 4 overtime
+
+**Calculation:**
+```
+Basic (8h):     8 × $7,959 × 1.0  = $63,672
+Extra Day (4h): 4 × $7,959 × 1.25 = $39,795
+Total:                               $103,467
+```
+
+```javascript
+case 'D': // Diurno
+    total = (8 * hourValue) + (4 * hourValue * 1.25);
+    details.basic = 8 * hourValue;
+    details.extra = 4 * hourValue * 1.25;
+    break;
+```
+
+### Example 2: Night Shift (Nocturno)
+
+**Given:**
+- Hourly Rate: $7,959
+- Shift: Night (12 hours)
+- Hours breakdown: 1 day + 7 night regular + 4 night overtime
+
+**Calculation:**
+```
+Basic (1h day):        1 × $7,959 × 1.0  = $7,959
+Basic (7h night):      7 × $7,959 × 1.0  = $55,713
+Night Surcharge (7h):  7 × $7,959 × 0.35 = $19,500
+Extra Night (4h):      4 × $7,959 × 1.75 = $55,713
+Total:                                     $138,885
+```
+
+```javascript
+case 'N': // Nocturno
+    details.basic = (1 * hourValue) + (7 * hourValue);
+    details.recargo = (7 * hourValue * 0.35);
+    details.extra = (4 * hourValue * 1.75);
+    total = details.basic + details.recargo + details.extra;
+    break;
+```
+
+### Example 3: Holiday/Extra Shift
+
+**Given:**
+- Hourly Rate: $7,959
+- Festive Surcharge: 0.80 (before July 2026)
+- Shift: Holiday/Extra (12 hours)
+- Hours breakdown: 8 base + 4 extra
+
+**Calculation:**
+```
+Basic (8h):              8 × $7,959 × 1.0        = $63,672
+Festive Surcharge (8h):  8 × $7,959 × 0.80       = $50,938
+Extra Festive (4h):      4 × $7,959 × (1.25+0.80) = $65,163
+Total:                                              $179,773
+```
+
+```javascript
+case 'E': // Extra/Festivo
+    const valBaseFest = 8 * hourValue * (1 + festSurcharge);
+    const valExtraFest = 4 * hourValue * (1.25 + festSurcharge);
+    total = valBaseFest + valExtraFest;
+    details.basic = 8 * hourValue;
+    details.recargo = (8 * hourValue * festSurcharge);
+    details.extra = valExtraFest; 
+    break;
+```
+
+<Tip>
+  The festive surcharge combines with other multipliers. For holiday overtime at night, you would add 1.75 (extra night) + 0.80 (festive) = 2.55× total multiplier.
+</Tip>
+
+## Day Component Calculations
+
+The `calculateDayComponents()` function (index.html:594-634) breaks down each day's pay into three components:
+
+**Components:**
+1. **Basic**: Regular hours at base rate
+2. **Recargo**: Surcharges (night, festive)
+3. **Extra**: Overtime hours
+
+**Example output structure:**
+```javascript
+{
+    total: 138885,
+    basic: 63672,
+    recargo: 19500,
+    extra: 55713
+}
+```
+
+These components are displayed in the day detail modal:
+
+| Shift Type | Basic Description | Recargo Description | Extra Description |
+|------------|-------------------|---------------------|-------------------|
+| Diurno (D) | 8h Ordinarias | 0 | 4h Extras Diurnas (1.25) |
+| Nocturno (N) | 1h Diu + 7h Noc | 7h Recargo Noc (0.35) | 4h Extra Noc (1.75) |
+| Descanso (X) | 8h Pago Básico | 0 | 0 |
+| Extra/Fest (E) | 8h Base | 8h Recargo Festivo | 4h Extra Festiva |
+| Permiso (P) | 8h Permiso Pago | 0 | 0 |
+| Ausencia (A) | 0 | 0 | 0 |
+
+## Automatic Updates
+
+Rates automatically recalculate when:
+
+- Base salary changes (triggers `fullRecalculate()`)
+- Month/year selection changes (may affect divisor)
+- Calendar is regenerated
+
+```javascript
+function fullRecalculate() {
+    updateEducationalTable();  // Updates all displayed rates
+    recalculate();             // Recalculates totals
+    renderGrid(year, month);   // Refreshes calendar display
+}
+```
+
+<Info>
+  The educational rates table shows rounded values for display purposes, but internal calculations use the full precision hourly rate to minimize rounding errors.
+</Info>
+
+## Best Practices
+
+<Tip>
+  Always verify the divisor shown in the rates table matches the expected legal requirement for your payroll period. The transition dates are July 1, 2026 for festive rates and July 15, 2026 for the divisor.
+</Tip>
+
+<Tip>
+  When explaining rates to employees, refer them to the "Guía de Tarifas y Recargos" section at the bottom of the calculator, which displays all current rates based on their salary.
+</Tip>
+
+<Info>
+  Night surcharge (0.35×) is applied in addition to the base rate, not as a replacement. A night hour is worth 1.35× the base rate (1.0 + 0.35).
+</Info>

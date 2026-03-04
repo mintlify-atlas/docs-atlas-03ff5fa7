@@ -1,0 +1,223 @@
+---
+title: 'Shift Patterns'
+description: 'Configure automatic shift rotation patterns for security guard scheduling'
+icon: 'calendar-days'
+---
+
+## Overview
+
+Calculadora Vigilancia supports 4 predefined shift patterns to automate schedule generation for security personnel. Each pattern defines a repeating cycle of day shifts (D), night shifts (N), and rest days (X).
+
+<CardGroup cols={2}>
+  <Card title="2x2x2 (Rotativo)" icon="rotate">
+    2 day shifts, 2 night shifts, 2 rest days
+    **Most common pattern**
+  </Card>
+  <Card title="4x2 Diurno" icon="sun">
+    4 day shifts, 2 rest days
+    **Day-only rotation**
+  </Card>
+  <Card title="4x2 Nocturno" icon="moon">
+    4 night shifts, 2 rest days
+    **Night-only rotation**
+  </Card>
+  <Card title="Manual" icon="hand">
+    No automatic pattern
+    **Full manual control**
+  </Card>
+</CardGroup>
+
+## Pattern Definitions
+
+The shift patterns are defined in the source code as:
+
+```javascript index.html (lines 399-404)
+const patterns = {
+    '2D2N2X': ['D', 'D', 'N', 'N', 'X', 'X'],
+    '4D2X': ['D', 'D', 'D', 'D', 'X', 'X'],
+    '4N2X': ['N', 'N', 'N', 'N', 'X', 'X'],
+    'MANUAL': ['X']
+};
+```
+
+### Pattern Codes
+
+- **D** = Diurno (Day shift) - 12 hours
+- **N** = Nocturno (Night shift) - 12 hours  
+- **X** = Descanso (Rest day)
+
+## How Patterns Work
+
+<Accordion title="Pattern Cycle Calculation">
+  The system calculates which shift to assign based on:
+  
+  1. **Cycle Start Date**: The reference date where the pattern begins
+  2. **Current Date**: The day being scheduled
+  3. **Days Difference**: Days elapsed since cycle start
+  4. **Modulo Operation**: Position in the pattern array
+
+  ```javascript index.html (lines 440-449)
+  for (let day = 1; day <= daysInMonth; day++) {
+      if(patternKey === 'MANUAL') {
+          dayStates[day] = 'X'; continue;
+      }
+      const currentObj = new Date(year, month - 1, day);
+      const diffTime = currentObj - cycleStartDate;
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      let patternIndex = diffDays % pattern.length;
+      if (patternIndex < 0) patternIndex = pattern.length + patternIndex;
+      dayStates[day] = pattern[patternIndex];
+  }
+  ```
+</Accordion>
+
+## 2D2N2X - Rotating Pattern
+
+**Cycle**: `['D', 'D', 'N', 'N', 'X', 'X']` (6 days)
+
+This pattern rotates guards through all shift types:
+
+| Day 1-2 | Day 3-4 | Day 5-6 | Repeat |
+|---------|---------|---------|--------|
+| Diurno  | Nocturno | Descanso | ♻️ |
+
+**Use Cases**:
+- Security companies with 24/7 coverage
+- Teams rotating through all shifts equally
+- Standard vigilance contracts
+
+**Financial Impact**:
+- Mixed earnings (day + night surcharges)
+- Predictable monthly totals
+- 20 work days per 30-day month
+
+## 4D2X - Day Shift Only
+
+**Cycle**: `['D', 'D', 'D', 'D', 'X', 'X']` (6 days)
+
+| Day 1-4 | Day 5-6 | Repeat |
+|---------|---------|--------|
+| Diurno  | Descanso | ♻️ |
+
+**Use Cases**:
+- Daytime-only facilities
+- Office building security
+- Lower risk environments
+
+**Financial Characteristics**:
+- Higher extra diurna (1.25x) hours
+- No night surcharges (0.35x)
+- Lower total pay vs night shifts
+
+## 4N2X - Night Shift Only
+
+**Cycle**: `['N', 'N', 'N', 'N', 'X', 'X']` (6 days)
+
+| Day 1-4 | Day 5-6 | Repeat |
+|---------|---------|--------|
+| Nocturno | Descanso | ♻️ |
+
+**Use Cases**:
+- Industrial facilities
+- Warehouse security
+- High-risk night operations
+
+**Financial Characteristics**:
+- Night surcharge on 7 hours (0.35x)
+- Extra nocturna on 4 hours (1.75x)
+- **Highest pay among patterns**
+
+<Accordion title="Night Shift Calculation Breakdown">
+  Night shifts (12 hours) are split as:
+  
+  - **1 hour**: Ordinary daytime (last hour before 9pm)
+  - **7 hours**: Night hours with 0.35x surcharge
+  - **4 hours**: Extra night hours with 1.75x multiplier
+
+  ```javascript index.html (lines 617-621)
+  case 'N': // Nocturno
+      details.basic = (1 * hourValue) + (7 * hourValue);
+      details.recargo = (7 * hourValue * 0.35);
+      details.extra = (4 * hourValue * 1.75);
+      total = details.basic + details.recargo + details.extra;
+  ```
+</Accordion>
+
+## Manual Mode
+
+**Cycle**: `['X']` - All days default to rest
+
+Manual mode disables automatic pattern generation. Each day must be individually configured through the interactive calendar.
+
+**Use Cases**:
+- Irregular schedules
+- Multi-site guards
+- Temporary assignments
+- Special coverage needs
+
+**Workflow**:
+1. Select "Manual" pattern
+2. Generate calendar (all days = Descanso)
+3. Click each day to set shift type
+4. Changes recalculate payroll instantly
+
+## State Configuration
+
+Beyond the standard D/N/X cycle, you can manually assign:
+
+```javascript index.html (lines 407-414)
+const stateConfig = {
+    'D': { label: 'Diurno', class: 'cell-diurno' },
+    'N': { label: 'Nocturno', class: 'cell-nocturno' },
+    'X': { label: 'Descanso', class: 'cell-descanso' },
+    'E': { label: 'Extra/Fest', class: 'cell-extra' },
+    'P': { label: 'Permiso', class: 'cell-permiso' },
+    'A': { label: 'Ausencia', class: 'cell-ausencia' }
+};
+```
+
+<CardGroup cols={3}>
+  <Card title="E - Extra/Festivo" icon="calendar-star">
+    Work on rest day or holiday
+    **Highest surcharges**
+  </Card>
+  <Card title="P - Permiso" icon="file-check">
+    Paid leave
+    **8h base pay, no extras**
+  </Card>
+  <Card title="A - Ausencia" icon="user-xmark">
+    Unjustified absence
+    **No pay (0)**
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Choose Pattern">
+    Select based on contract terms and client needs
+  </Step>
+  <Step title="Set Cycle Start">
+    Use contract start date or first day of month
+  </Step>
+  <Step title="Generate & Review">
+    Check calendar matches expected rotation
+  </Step>
+  <Step title="Adjust Manually">
+    Override specific days for holidays or absences
+  </Step>
+  <Step title="Verify Totals">
+    Ensure work days align with contract (typically 20-22 days/month)
+  </Step>
+</Steps>
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Payroll Calculation" icon="calculator" href="/features/payroll-calculation">
+    How shifts translate to earnings
+  </Card>
+  <Card title="Interactive Calendar" icon="calendar" href="/features/interactive-calendar">
+    Edit individual days
+  </Card>
+</CardGroup>

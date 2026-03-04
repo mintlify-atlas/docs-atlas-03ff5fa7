@@ -1,0 +1,534 @@
+---
+title: 'Interactive Calendar'
+description: 'Day-by-day visual scheduling with real-time payroll updates and modal editing'
+icon: 'calendar'
+---
+
+## Overview
+
+The interactive calendar provides a visual, clickable interface to manage security guard schedules. Each day displays its shift type, applicable divisor, and calculated pay. Click any day to open a detailed modal with breakdown calculations and editing options.
+
+## Calendar Layout
+
+### Grid Structure
+
+```javascript index.html (lines 456-493)
+function renderGrid(year, month) {
+    const grid = document.getElementById('calendarGrid');
+    grid.innerHTML = '';
+    const firstDayOfMonth = new Date(year, month - 1, 1);
+    const startDayOfWeek = firstDayOfMonth.getDay(); 
+    const daysInMonth = dayStates.length - 1;
+
+    // Empty cells for alignment
+    for (let i = 0; i < startDayOfWeek; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'day-cell empty';
+        grid.appendChild(empty);
+    }
+
+    // Render each day
+    for (let day = 1; day <= daysInMonth; day++) {
+        const state = dayStates[day];
+        const cell = document.createElement('button');
+        cell.setAttribute('type', 'button');
+        const config = stateConfig[state];
+        const divisor = getDivisorForDate(year, month, day);
+        const cellVals = calculateDayComponents(state, year, month, day); 
+
+        cell.id = `day-${day}`;
+        cell.className = `day-cell ${config.class}`;
+        
+        const moneyText = Math.round(cellVals.total).toLocaleString();
+        cell.setAttribute('aria-label', `Día ${day}, ${config.label}, Valor: $${moneyText}. Haz clic para detalles.`);
+        
+        cell.onclick = () => openModal(day);
+
+        cell.innerHTML = `
+            <div class="day-number">${day} <span class="rate-indicator">${divisor}h</span></div>
+            <div class="day-label">${config.label}</div>
+            <div class="day-money">$ ${Math.round(cellVals.total).toLocaleString()}</div>
+        `;
+        grid.appendChild(cell);
+    }
+}
+```
+
+**Features**:
+- **7-day week layout** with Sunday-Saturday header
+- **Empty cells** for proper calendar alignment
+- **Color-coded** shift types via CSS classes
+- **Accessible** with ARIA labels and button semantics
+
+### Day Cell Components
+
+<CardGroup cols={3}>
+  <Card title="Day Number" icon="hashtag">
+    **Top-left**: Day of month
+    
+    **Top-right**: Divisor indicator (220h/210h)
+  </Card>
+  <Card title="Shift Label" icon="tag">
+    **Center**: Shift type name
+    
+    Diurno, Nocturno, Descanso, etc.
+  </Card>
+  <Card title="Daily Pay" icon="dollar-sign">
+    **Bottom**: Total calculated value
+    
+    Updates instantly on changes
+  </Card>
+</CardGroup>
+
+## Color Coding System
+
+```javascript index.html (lines 407-414)
+const stateConfig = {
+    'D': { label: 'Diurno', class: 'cell-diurno' },
+    'N': { label: 'Nocturno', class: 'cell-nocturno' },
+    'X': { label: 'Descanso', class: 'cell-descanso' },
+    'E': { label: 'Extra/Fest', class: 'cell-extra' },
+    'P': { label: 'Permiso', class: 'cell-permiso' },
+    'A': { label: 'Ausencia', class: 'cell-ausencia' }
+};
+```
+
+### CSS Color Definitions
+
+```css index.html (lines 15-21)
+--day-bg: #fff3cd; --day-text: #533f03;     /* Yellow - Day shift */
+--night-bg: #d1ecf1; --night-text: #0c5460;  /* Blue - Night shift */
+--rest-bg: #d4edda; --rest-text: #155724;    /* Green - Rest day */
+--perm-bg: #e8daef; --perm-text: #6c3483;    /* Purple - Leave */
+--abs-bg: #fadbd8; --abs-text: #922b21;      /* Red - Absence */
+--extra-bg: #ffe0b2; --extra-text: #e65100;  /* Orange - Holiday work */
+```
+
+<AccordionGroup>
+  <Accordion title="Diurno (Day Shift)" icon="sun">
+    **Color**: Yellow (`#fff3cd`)
+    
+    **Indicates**: 12-hour daytime shift (8h base + 4h extra diurna)
+    
+    **Visual Priority**: Medium visibility
+  </Accordion>
+  
+  <Accordion title="Nocturno (Night Shift)" icon="moon">
+    **Color**: Blue (`#d1ecf1`)
+    
+    **Indicates**: 12-hour nighttime shift (recargo nocturno + extra nocturna)
+    
+    **Visual Priority**: High value (blue = premium pay)
+  </Accordion>
+  
+  <Accordion title="Descanso (Rest Day)" icon="bed">
+    **Color**: Green (`#d4edda`)
+    
+    **Indicates**: Paid rest day (8h base, no extras)
+    
+    **Visual Priority**: Neutral/positive
+  </Accordion>
+  
+  <Accordion title="Extra/Festivo (Holiday Work)" icon="star">
+    **Color**: Orange (`#ffe0b2`)
+    
+    **Indicates**: Work on scheduled rest day or holiday (highest surcharges)
+    
+    **Visual Priority**: **Highest** - most valuable shift
+  </Accordion>
+  
+  <Accordion title="Permiso (Paid Leave)" icon="file-check">
+    **Color**: Purple (`#e8daef`)
+    
+    **Indicates**: Authorized paid absence (8h base pay)
+    
+    **Visual Priority**: Administrative
+  </Accordion>
+  
+  <Accordion title="Ausencia (Unpaid Absence)" icon="ban">
+    **Color**: Red (`#fadbd8`)
+    
+    **Indicates**: Unjustified absence (no pay, affects deductions)
+    
+    **Visual Priority**: Alert/warning
+  </Accordion>
+</AccordionGroup>
+
+## Interactive Modal System
+
+### Opening the Modal
+
+```javascript index.html (lines 496-522)
+function openModal(day) {
+    currentSelectedDay = day;
+    const year = parseInt(document.getElementById('selYear').value);
+    const month = parseInt(document.getElementById('selMonth').value);
+    
+    // 1. Title
+    const months = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
+                    "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+    document.getElementById('modalDateTitle').innerText = `Día ${day} de ${months[month-1]} ${year}`;
+    
+    // 2. Law Info
+    const divisor = getDivisorForDate(year, month, day);
+    const salary = getRawMoney('baseSalary');
+    const hourValue = Math.round(salary / divisor);
+    document.getElementById('modalLawInfo').innerText = 
+        `Divisor ${divisor} horas | Valor Hora: ${formatMoney(hourValue)}`;
+
+    // 3. Pre-select current state
+    const currentState = dayStates[day];
+    document.getElementById('modalShiftSelector').value = currentState;
+
+    // 4. Calculate and display
+    updateModalCalculations(year, month, day, currentState);
+
+    // 5. Show modal
+    document.getElementById('dayModal').style.display = 'flex';
+    document.getElementById('modalShiftSelector').focus();
+}
+```
+
+**Modal displays**:
+1. **Date title**: "Día 15 de Marzo 2026"
+2. **Legal context**: Divisor and hour value for that specific date
+3. **Shift selector**: Dropdown to change shift type
+4. **Breakdown table**: Basic/Recargos/Extras/Total
+
+### Modal Navigation
+
+```javascript index.html (lines 524-536)
+function changeModalDay(offset) {
+    const year = parseInt(document.getElementById('selYear').value);
+    const month = parseInt(document.getElementById('selMonth').value);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    
+    const newDay = currentSelectedDay + offset;
+
+    // Validate limits
+    if (newDay >= 1 && newDay <= daysInMonth) {
+        openModal(newDay);
+    }
+}
+```
+
+**Navigation buttons**:
+- **❮ (Previous)**: `changeModalDay(-1)` - Go to previous day
+- **❯ (Next)**: `changeModalDay(1)` - Go to next day
+- **Boundaries**: Disabled at day 1 and last day of month
+
+<Accordion title="Keyboard Navigation">
+  ```javascript index.html (lines 587-591)
+  document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+          closeModal();
+      }
+  });
+  ```
+
+  **Supported keys**:
+  - **Escape**: Close modal and return focus to day button
+  - **Tab**: Navigate between dropdown and navigation buttons
+  - **Enter/Space**: Activate buttons (standard behavior)
+</Accordion>
+
+### Modal Breakdown Table
+
+```javascript index.html (lines 549-561)
+function updateModalCalculations(year, month, day, state) {
+    const comps = calculateDayComponents(state, year, month, day);
+    
+    document.getElementById('tdBasicVal').innerText = formatMoney(comps.basic);
+    document.getElementById('tdRecVal').innerText = formatMoney(comps.recargo);
+    document.getElementById('tdExtVal').innerText = formatMoney(comps.extra);
+    document.getElementById('tdTotalVal').innerText = formatMoney(comps.total);
+
+    const desc = getDescriptions(state);
+    document.getElementById('tdBasicDesc').innerText = desc.basic;
+    document.getElementById('tdRecDesc').innerText = desc.recargo;
+    document.getElementById('tdExtDesc').innerText = desc.extra;
+}
+```
+
+**Table columns**:
+1. **Concepto**: Type of pay (Básico, Recargos, Extras)
+2. **Cálculo**: Description of calculation (e.g., "8h Ordinarias")
+3. **Valor**: Monetary amount
+
+### Description Logic
+
+```javascript index.html (lines 563-573)
+function getDescriptions(state) {
+    switch(state) {
+        case 'D': return { basic: '8h Ordinarias', recargo: '0', extra: '4h Extras Diurnas (1.25)' };
+        case 'N': return { basic: '1h Diu + 7h Noc', recargo: '7h Recargo Noc (0.35)', extra: '4h Extra Noc (1.75)' };
+        case 'X': return { basic: '8h Pago Básico', recargo: '0', extra: '0' };
+        case 'E': return { basic: '8h Base', recargo: '8h Recargo Festivo', extra: '4h Extra Festiva' };
+        case 'P': return { basic: '8h Permiso Pago', recargo: '0', extra: '0' };
+        case 'A': return { basic: '0', recargo: '0', extra: '0' };
+        default: return { basic: '-', recargo: '-', extra: '-' };
+    }
+}
+```
+
+**Example for Night Shift**:
+- **Básico**: "1h Diu + 7h Noc" = $63,672
+- **Recargos**: "7h Recargo Noc (0.35)" = $19,498
+- **Extras**: "4h Extra Noc (1.75)" = $55,714
+- **Total**: $138,884
+
+## Editing Workflow
+
+<Steps>
+  <Step title="Click a Day">
+    Click any calendar day to open the editing modal
+  </Step>
+  
+  <Step title="Review Current State">
+    Modal shows current shift type and calculated breakdown
+  </Step>
+  
+  <Step title="Change Shift Type">
+    Select new shift from dropdown:
+    - ☀️ Diurno (12h)
+    - 🌑 Nocturno (12h)
+    - 🟢 Descanso
+    - 🟠 Extra/Festivo
+    - 🟣 Permiso Remunerado
+    - 🔴 Ausencia No Justificada
+  </Step>
+  
+  <Step title="Auto-Recalculation">
+    onChange event triggers immediate recalculation:
+    
+    ```javascript index.html (lines 538-547)
+    function updateDayFromModal() {
+        const newState = document.getElementById('modalShiftSelector').value;
+        const year = parseInt(document.getElementById('selYear').value);
+        const month = parseInt(document.getElementById('selMonth').value);
+        
+        dayStates[currentSelectedDay] = newState;
+        updateModalCalculations(year, month, currentSelectedDay, newState);
+        renderGrid(year, month);
+        recalculate();
+    }
+    ```
+  </Step>
+  
+  <Step title="View Updates">
+    - Modal table updates with new breakdown
+    - Calendar cell re-renders with new color/value
+    - Monthly totals recalculate (devengado, deducciones, neto)
+  </Step>
+  
+  <Step title="Navigate or Close">
+    - Use ❮ ❯ to edit adjacent days
+    - Press **Escape** or click **×** to close
+    - Focus returns to the day button for accessibility
+  </Step>
+</Steps>
+
+## Real-Time Recalculation
+
+### Update Chain
+
+```javascript index.html (lines 418-424)
+function fullRecalculate() {
+    updateEducationalTable();
+    recalculate();
+    const year = parseInt(document.getElementById('selYear').value);
+    const month = parseInt(document.getElementById('selMonth').value);
+    renderGrid(year, month);
+}
+```
+
+**Triggered by**:
+- Changing salary or transport fields
+- Switching shift pattern or cycle start date
+- Toggling commercial/real month mode
+- Editing individual days in modal
+
+**Updates**:
+1. **Educational table**: Hour value and rate cards
+2. **Monthly totals**: Loop through all days, sum components
+3. **Calendar grid**: Re-render all cells with new values
+
+<Note>
+  All calculations happen **client-side** in JavaScript - no server requests. Updates are instant.
+</Note>
+
+## Accessibility Features
+
+### ARIA Labels
+
+```javascript
+cell.setAttribute('aria-label', `Día ${day}, ${config.label}, Valor: $${moneyText}. Haz clic para detalles.`);
+```
+
+**Screen reader output**: "Día 15, Nocturno, Valor: $138,884. Haz clic para detalles."
+
+### Semantic HTML
+
+```javascript
+const cell = document.createElement('button');
+cell.setAttribute('type', 'button');
+```
+
+- Uses `<button>` instead of `<div>` for clickable days
+- Keyboard navigable with Tab
+- Activatable with Enter/Space
+
+### Focus Management
+
+```javascript index.html (lines 575-584)
+function closeModal(event) {
+    if (!event || event.target.id === 'dayModal' || event.target.classList.contains('close-btn')) {
+        document.getElementById('dayModal').style.display = 'none';
+        // Restore focus to the day button
+        if (currentSelectedDay) {
+            const btn = document.getElementById(`day-${currentSelectedDay}`);
+            if(btn) btn.focus();
+        }
+    }
+}
+```
+
+**Focus flow**:
+1. Click day → Modal opens → Focus on dropdown
+2. Edit → Updates visible
+3. Close modal → Focus returns to day button (preserves user position)
+
+### Visual Focus Indicators
+
+```css index.html (lines 67-70)
+button:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+}
+```
+
+**Keyboard users** see clear green outline on focused elements.
+
+## Hover Effects
+
+```css index.html (lines 99)
+.day-cell:hover, .day-cell:focus { 
+    transform: scale(1.02); 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15); 
+    z-index: 5; 
+    position: relative; 
+}
+```
+
+**Visual feedback**:
+- Cell slightly enlarges (2%)
+- Drop shadow appears
+- Brought to front (z-index)
+
+## Performance Optimization
+
+### Incremental Rendering
+
+The grid renders only visible days (28-31), not the entire year. Pattern generation loops only through current month.
+
+### Calculation Caching
+
+`calculateDayComponents()` is called per-day but uses constant-time lookups (no nested loops). Monthly totals loop once through 28-31 days.
+
+### Minimal DOM Updates
+
+On single-day edit:
+1. Only that day's cell re-renders
+2. Summary section updates (4-5 DOM writes)
+3. Modal table updates (4 rows)
+
+Total: ~10 DOM operations vs full re-render.
+
+## Example: Editing a Holiday
+
+**Scenario**: March 20, 2026 is a holiday. Change from "Descanso" to "Extra/Fest".
+
+<Steps>
+  <Step title="Current State">
+    - Calendar shows: **Green cell**, "Descanso", **$63,672**
+    - Monthly total: $2,850,000
+  </Step>
+  
+  <Step title="Click Day 20">
+    Modal opens:
+    - Title: "Día 20 de Marzo 2026"
+    - Info: "Divisor 220 horas | Valor Hora: $7,959"
+    - Selector: "🟢 Descanso" selected
+    - Breakdown: Basic $63,672 | Recargos $0 | Extras $0
+  </Step>
+  
+  <Step title="Select 'Extra/Festivo'">
+    onChange fires → `updateDayFromModal()`
+  </Step>
+  
+  <Step title="Instant Updates">
+    **Modal**:
+    - Basic: $63,672
+    - Recargos: $50,938 (8h × 0.80)
+    - Extras: $65,302 (4h × 2.05)
+    - Total: **$179,912**
+    
+    **Calendar**:
+    - Cell turns **orange**
+    - Label: "Extra/Fest"
+    - Value: **$179,912**
+    
+    **Monthly**:
+    - Devengado: +$116,240 ($2,966,240)
+    - Deducciones: +$9,299 (8% of increase)
+    - Neto: +$106,941
+  </Step>
+  
+  <Step title="Close Modal">
+    Calendar now shows the holiday with correct premium pay
+  </Step>
+</Steps>
+
+**Impact**: Single holiday worked adds ~$107k to net pay.
+
+## Mobile Responsiveness
+
+```css index.html (lines 80-81)
+.calendar-wrapper { margin-bottom: 40px; overflow-x: auto; }
+```
+
+On mobile:
+- Calendar horizontally scrolls if needed
+- Day cells have `minmax(50px, 1fr)` for minimum touch target size
+- Modal is full-screen (90% width, centered)
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Start with Pattern" icon="wand-magic-sparkles">
+    Generate automatic pattern first, then manually adjust exceptions (holidays, sick days)
+  </Card>
+  
+  <Card title="Use Color Coding" icon="palette">
+    Quickly scan calendar for high-value days (orange = festive, blue = night)
+  </Card>
+  
+  <Card title="Verify Divisors" icon="clock">
+    Check divisor indicators (220h/210h) during transition months like July 2026
+  </Card>
+  
+  <Card title="Modal Navigation" icon="arrows-left-right">
+    Use ❮ ❯ buttons to quickly edit consecutive days without closing modal
+  </Card>
+</CardGroup>
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Shift Patterns" icon="calendar-days" href="/features/shift-patterns">
+    Automatic pattern generation
+  </Card>
+  <Card title="Payroll Calculation" icon="calculator" href="/features/payroll-calculation">
+    How day values are calculated
+  </Card>
+</CardGroup>
