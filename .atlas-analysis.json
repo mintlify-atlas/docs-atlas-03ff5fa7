@@ -1,0 +1,65 @@
+{
+  "projectType": "frontend",
+  "projectName": "Calculadora Vigilancia",
+  "projectDescription": "A payroll calculator for security guards in Colombia with shift scheduling and Colombian labor law compliance",
+  "theme": "mint",
+  "primaryColor": "#2c3e50",
+  "lightColor": "#27ae60",
+  "darkColor": "#17a2b8",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": [
+          "introduction",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "Features",
+        "pages": [
+          "features/shift-patterns",
+          "features/payroll-calculation",
+          "features/colombian-labor-law",
+          "features/interactive-calendar"
+        ]
+      },
+      {
+        "group": "User Guide",
+        "pages": [
+          "guide/setting-up-salary",
+          "guide/selecting-shifts",
+          "guide/understanding-rates",
+          "guide/exporting-pdf"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "reference/shift-types",
+          "reference/surcharge-rates",
+          "reference/deductions",
+          "reference/calculations"
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Interactive calendar-based shift scheduling",
+    "Automatic payroll calculation with Colombian labor law compliance",
+    "Multiple shift patterns (2x2x2 rotativo, 4x2 diurno, 4x2 nocturno)",
+    "Day/night shift surcharges and overtime calculation",
+    "PDF export for payroll reports",
+    "Automatic divisor adjustment (220h/210h) based on labor law changes",
+    "Support for holidays, absences, and paid leave",
+    "Real-time calculation of health and pension deductions"
+  ],
+  "publicApiSurface": [
+    "Shift Types: Diurno (Day), Nocturno (Night), Descanso (Rest), Extra/Festivo (Holiday), Permiso (Leave), Ausencia (Absence)",
+    "Shift Patterns: 2D2N2X (2-day/2-night/2-rest rotation), 4D2X (4-day/2-rest), 4N2X (4-night/2-rest), MANUAL",
+    "Surcharge Rates: Night surcharge (0.35x), Day overtime (1.25x), Night overtime (1.75x), Holiday rates (1.8x-2.65x)",
+    "Deductions: Health (4%), Pension (4%)",
+    "Export: PDF payroll report generation",
+    "Calculation Modes: Commercial Month (30 days) or Real Days"
+  ]
+}
